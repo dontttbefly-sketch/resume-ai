@@ -8,6 +8,6 @@ MINIMAX_BASE_URL = "https://api.minimaxi.com/v1"
 MINIMAX_MODEL = "MiniMax-M3"
 # 部署后把前端站点地址加进来，如 "https://xxx.github.io,http://localhost:5173"
 # 不配置则不限制来源（还有邀请码这道门兜底）
-ALLOWED_ORIGINS = ""
+ALLOWED_ORIGINS = "https://dontttbefly-sketch.github.io,http://localhost:5173"
 # 每个邀请码每小时最多几次 AI 请求
 RATE_LIMIT_PER_HOUR = "30"
