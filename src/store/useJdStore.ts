@@ -12,6 +12,7 @@ import { analyzeJd, type JdAnalysis } from "../lib/jdMatch";
 import { chat, LlmError, type LlmErrorKind } from "../lib/llm";
 import { buildPhraseMessages, parsePhrases, type Phrase } from "../lib/prompts";
 import { flattenResume } from "../lib/resumeText";
+import { useExperienceStore } from "./useExperienceStore";
 import { useResumeStore } from "./useResumeStore";
 
 const STORAGE_KEY = "resume-ai/jd";
@@ -78,7 +79,11 @@ export const useJdStore = create<JdState>()(
         try {
           const { sections, visibility } = useResumeStore.getState();
           const flat = flattenResume(sections, visibility);
-          const messages = buildPhraseMessages(flat, jdText, analysis);
+          const library = useExperienceStore
+            .getState()
+            .items.map((i) => `- ${i.company}｜${i.project}：${i.summary}`)
+            .join("\n");
+          const messages = buildPhraseMessages(flat, jdText, analysis, library);
           const raw = await chat(messages);
           const phrases = parsePhrases(raw);
 

@@ -23,6 +23,7 @@ const SYSTEM = `你在帮一位中文求职者写招聘平台上的打招呼话�
 - 每条 60 到 110 字，绝对不要超过 120 字
 - 第一句就交代「我是谁 + 我能做什么」，不要用问候语开头
 - 只能引用对方简历里真实存在的内容，绝对不许编造经历、公司、数字或技能
+- 如果给了【经历库】，那是求职者自己补充的真实经历细节，比简历正文更丰富。写话术时可优先引用它来充实内容（它同样真实，不算编造），但数字和经历必须来自简历或经历库，仍不许凭空捏造
 - 动词强度不得超过简历原文：简历写「接入」就不能写成「主导」「独立设计」，简历没写「独立完成」就不能这么讲。宁可平实，也不要拔高
 - 简历里标明是实习、兼职的经历，不要用正式全职的口气去讲
 - 呼应岗位描述里的关键词，但读起来要自然，不要堆词
@@ -37,6 +38,7 @@ export function buildPhraseMessages(
   flat: FlatResume,
   jdText: string,
   analysis: JdAnalysis,
+  experienceLibrary?: string,
 ): ChatMessage[] {
   const covered = analysis.hits.map((k) => k.term).join("、") || "（无）";
   const missing = analysis.missing.map((k) => k.term).join("、") || "（无）";
@@ -63,6 +65,7 @@ export function buildPhraseMessages(
 
   const user = `【我的简历】
 ${renderForModel(flat)}
+${experienceLibrary ? `\n【经历库（求职者补充的真实细节，可优先引用）】\n${experienceLibrary}` : ""}
 
 【目标岗位描述】
 ${jdText.trim().slice(0, 3000)}
