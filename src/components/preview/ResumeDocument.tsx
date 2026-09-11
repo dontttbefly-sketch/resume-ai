@@ -22,7 +22,7 @@ function useQrCode(): string {
 function FooterQr({ qr }: { qr: string }) {
   if (!qr) return null;
   return (
-    <footer className="mt-[2px] flex items-center justify-between border-t border-line pt-[3px]">
+    <footer className="mt-[2px] flex items-center justify-end gap-2.5 border-t border-line pt-[3px]">
       <p className="text-small text-ink-muted">作品集 · 扫码即达</p>
       <img src={qr} alt="" className="h-[17mm] w-[17mm] shrink-0" />
     </footer>
