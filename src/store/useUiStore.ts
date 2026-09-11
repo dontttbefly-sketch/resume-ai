@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-export type AppView = "resume" | "jd" | "pool";
+export type AppView = "resume" | "jd" | "pool" | "experience";
 
 interface UiState {
   view: AppView;
