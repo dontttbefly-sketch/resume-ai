@@ -36,7 +36,7 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
   if (!name && !title && metas.length === 0 && !body && !avatar && !qr) return null;
 
   return (
-    <header className="border-b border-line pb-1.5">
+    <header className="border-b border-line pb-1">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {name && <h1 className="text-name font-bold text-ink">{name}</h1>}
@@ -44,15 +44,14 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
           {metas.length > 0 && (
             <p className="tnum mt-1 text-small text-ink-muted">{metas.join(" · ")}</p>
           )}
-          {body && <p className="mt-2 whitespace-pre-line text-body text-ink">{body}</p>}
+          {body && <p className="mt-1 whitespace-pre-line text-body text-ink">{body}</p>}
         </div>
 
         {(qr || avatar) && (
-          /* 右侧是「作品二维码 + 证件照」横排。二维码与照片同高（20mm），
-             两者加起来不到 50mm，只要左列文字比 20mm 高（必然如此），
-             抬头总高就仍由左列决定，不会因为加了码而变高。 */
-          <div className="flex shrink-0 items-start gap-2">
-            {qr && <img src={qr} alt="" className="h-[20mm] w-[20mm] shrink-0" />}
+          /* 右侧竖排：证件照在上、作品二维码在下（中间留空）。
+             二维码 18mm 保证可扫；右列总高约 150px，抬头高度由右列决定，
+             超出的部分靠全局间距微调消化（见 index.css 注释）。 */
+          <div className="flex shrink-0 flex-col items-center gap-2">
             {avatar && (
               <img
                 src={avatar}
@@ -60,6 +59,7 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
                 className="h-[20mm] w-[20mm] shrink-0 rounded-sm object-cover"
               />
             )}
+            {qr && <img src={qr} alt="" className="h-[17mm] w-[17mm] shrink-0" />}
           </div>
         )}
       </div>
@@ -77,7 +77,7 @@ function EntriesLayout({ desc, entries }: { desc: SectionDescriptor; entries: En
   const bulletFields = fieldsByRole(desc, "bullets");
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-[2px]">
       {entries.map((entry) => {
         const primary = joinValues(entry, fieldsByRole(desc, "primary"));
         const dates = formatDateRange(entry, fieldsByRole(desc, "date"));
