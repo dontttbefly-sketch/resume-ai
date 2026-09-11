@@ -31,6 +31,7 @@ const SUBTITLE: Record<AppView, string> = {
   resume: "内容自动保存在本机，随时导出 PDF",
   jd: "粘贴岗位描述，看匹配度与话术",
   pool: "抓来的岗位按匹配度排序，投递还是你自己来",
+  experience: "和 AI 聊聊经历，沉淀成写简历的素材库",
 };
 
 function ViewTab({
@@ -196,6 +197,12 @@ export function Toolbar() {
                 {poolCount}
               </span>
             )}
+          </span>
+        </ViewTab>
+        <ViewTab active={view === "experience"} view="experience">
+          <span className="inline-flex items-center gap-1">
+            <IconDoc className="h-3.5 w-3.5" />
+            经历库
           </span>
         </ViewTab>
       </div>

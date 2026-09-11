@@ -2,6 +2,7 @@ import { EditorPanel } from "./components/EditorPanel";
 import { Toolbar } from "./components/Toolbar";
 import { JdPanel } from "./components/jd/JdPanel";
 import { PoolPanel } from "./components/pool/PoolPanel";
+import { ExperiencePanel } from "./components/experience/ExperiencePanel";
 import { PreviewPanel } from "./components/preview/PreviewPanel";
 import { useUiStore } from "./store/useUiStore";
 
@@ -20,6 +21,7 @@ export default function App() {
         )}
         {view === "jd" && <JdPanel />}
         {view === "pool" && <PoolPanel />}
+        {view === "experience" && <ExperiencePanel />}
       </div>
     </div>
   );
