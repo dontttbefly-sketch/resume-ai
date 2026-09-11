@@ -23,7 +23,7 @@ export function ResumeDocument() {
         const isHeader = desc.layout === "header";
 
         return (
-          <section key={desc.key} className={isHeader ? "" : "mt-1.5"}>
+          <section key={desc.key} className={isHeader ? "" : "mt-[2px]"}>
             {!isHeader && (
               <h2 className="mb-0.5 text-heading font-semibold text-ink">
                 <span className="border-b-2 border-brand pb-px">{desc.label}</span>
