@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { exportPdf } from "../lib/print";
+import { buildAiDevResume } from "../data/privateResume";
 import { checkCompletion } from "../lib/resume";
 import { MAX_PROFILES, useResumeStore } from "../store/useResumeStore";
 import { usePoolStore } from "../store/usePoolStore";
@@ -143,6 +144,8 @@ export function Toolbar() {
   const visibility = useResumeStore((s) => s.visibility);
   const loadMine = useResumeStore((s) => s.loadMine);
   const loadFull = useResumeStore((s) => s.loadFull);
+  const loadAiDev = useResumeStore((s) => s.loadAiDev);
+  const hasAiDev = buildAiDevResume() != null;
   const loadSample = useResumeStore((s) => s.loadSample);
   const clearAll = useResumeStore((s) => s.clearAll);
 
@@ -240,6 +243,19 @@ export function Toolbar() {
               <IconLayers className="h-3.5 w-3.5" />
               载入完整版
             </Btn>
+
+            {hasAiDev && (
+              <Btn
+                variant="outline"
+                title="AI 开发工程师版：面向开发岗重写的侧重版本，配合「新建档案」使用不覆盖其他简历"
+                onClick={() => {
+                  if (window.confirm("载入 AI 开发版会覆盖当前档案内容（建议先新建一份档案），确定吗？")) loadAiDev();
+                }}
+              >
+                <IconDoc className="h-3.5 w-3.5" />
+                载入 AI 开发版
+              </Btn>
+            )}
 
             <Btn
               variant="outline"

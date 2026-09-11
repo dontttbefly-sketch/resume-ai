@@ -10,7 +10,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { EntryData, FieldValue } from "../data/schema";
 import { SECTION_MAP, SECTIONS, type SectionKey } from "../data/sections";
-import { buildMyResume, buildFullResume } from "../data/privateResume";
+import { buildMyResume, buildFullResume, buildAiDevResume } from "../data/privateResume";
 import { buildEmptyResume, buildSampleResume, makeBlankEntry, normalizeSections } from "../data/sampleResume";
 
 const STORAGE_KEY = "resume-ai/resume";
@@ -82,6 +82,8 @@ export interface ResumeState {
   /* 整体操作 */
   loadMine: () => void;
   loadFull: () => void;
+  /** 载入 AI 开发工程师版（本机放了私有数据才有） */
+  loadAiDev: () => void;
   loadSample: () => void;
   clearAll: () => void;
 }
@@ -358,6 +360,11 @@ export const useResumeStore = create<ResumeState>()(
 
       loadMine: () => set(() => buildMyResume()),
       loadFull: () => set(() => buildFullResume()),
+      loadAiDev: () =>
+        set(() => {
+          const resume = buildAiDevResume();
+          return resume ?? {};
+        }),
       loadSample: () => set(() => buildSampleResume()),
       clearAll: () => set(() => buildEmptyResume()),
     }),

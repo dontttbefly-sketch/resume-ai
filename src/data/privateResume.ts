@@ -16,15 +16,27 @@
 import type { Resume } from "./schema";
 import { buildEmptyResume, buildSampleResume } from "./sampleResume";
 
-const modules = import.meta.glob<{ buildMyResume?: () => Resume; buildFullResume?: () => Resume }>(
-  "./private/myResume*.ts",
+const modules = import.meta.glob<{
+  buildMyResume?: () => Resume;
+  buildFullResume?: () => Resume;
+  buildAiDevResume?: () => Resume;
+}>("./private/myResume*.ts", { eager: true });
+const aiDevModules = import.meta.glob<{ buildAiDevResume?: () => Resume }>(
+  "./private/aidevResume.ts",
   { eager: true },
 );
 
-function pick(key: "buildMyResume" | "buildFullResume"): Resume {
+function pick(key: "buildMyResume" | "buildFullResume" | "buildAiDevResume"): Resume | null {
   for (const mod of Object.values(modules)) {
     const fn = mod[key];
     if (typeof fn === "function") return fn();
+  }
+  if (key === "buildAiDevResume") {
+    for (const mod of Object.values(aiDevModules)) {
+      const fn = mod.buildAiDevResume;
+      if (typeof fn === "function") return fn();
+    }
+    return null;
   }
   // 没有私有数据：示例数据顶上（clone 仓库后的开箱体验）
   return key === "buildMyResume" ? buildSampleResume() : buildEmptyResume();
@@ -32,12 +44,17 @@ function pick(key: "buildMyResume" | "buildFullResume"): Resume {
 
 /** 一页版简历（默认载入） */
 export function buildMyResume(): Resume {
-  return pick("buildMyResume");
+  return pick("buildMyResume") ?? buildSampleResume();
 }
 
 /** 完整版简历（工具栏「载入完整版」） */
 export function buildFullResume(): Resume {
-  return pick("buildFullResume");
+  return pick("buildFullResume") ?? buildEmptyResume();
+}
+
+/** AI 开发工程师版简历（本机放了私有数据才有，否则 null） */
+export function buildAiDevResume(): Resume | null {
+  return pick("buildAiDevResume");
 }
 
 /** 本机是否放了私有数据（用来决定「载入一页版/完整版」按钮的行为提示） */
