@@ -30,10 +30,7 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
   const body = joinValues(entry, fieldsByRole(desc, "body"), "\n");
   const avatarField = fieldsByRole(desc, "avatar")[0];
   const avatar = avatarField ? asString(entry.values[avatarField.key]).trim() : "";
-  const qrField = fieldsByRole(desc, "qr")[0];
-  const qr = qrField ? asString(entry.values[qrField.key]).trim() : "";
-
-  if (!name && !title && metas.length === 0 && !body && !avatar && !qr) return null;
+  if (!name && !title && metas.length === 0 && !body && !avatar) return null;
 
   return (
     <header className="border-b border-line pb-1">
@@ -47,20 +44,12 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
           {body && <p className="mt-1 whitespace-pre-line text-body text-ink">{body}</p>}
         </div>
 
-        {(qr || avatar) && (
-          /* 右侧竖排：证件照在上、作品二维码在下（中间留空）。
-             二维码 18mm 保证可扫；右列总高约 150px，抬头高度由右列决定，
-             超出的部分靠全局间距微调消化（见 index.css 注释）。 */
-          <div className="flex shrink-0 flex-col items-center gap-2">
-            {avatar && (
-              <img
-                src={avatar}
-                alt=""
-                className="h-[20mm] w-[20mm] shrink-0 rounded-sm object-cover"
-              />
-            )}
-            {qr && <img src={qr} alt="" className="h-[17mm] w-[17mm] shrink-0" />}
-          </div>
+        {avatar && (
+          <img
+            src={avatar}
+            alt=""
+            className="h-[20mm] w-[20mm] shrink-0 rounded-sm object-cover"
+          />
         )}
       </div>
     </header>
