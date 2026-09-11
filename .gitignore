@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 私有数据：你的真实简历、证件照、二维码绝不进开源仓库
+src/data/private/
+public/private/
+
+# 密钥与环境
+.env.local
+.env.*.local
+
+# 其他
+*.log
+.DS_Store
+.wrangler/
+
+# 导出示例含真实个人信息，仅本机保留
+一页版导出示例.pdf
+完整版导出示例.pdf

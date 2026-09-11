@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+/* ============================================================================
+ * 设计 token
+ *
+ * 全部排版规范集中在这里。想改字号、配色、字体，只改这一段即可。
+ * ========================================================================== */
+
+@theme {
+  /* 字体：拉丁走打包的 Inter，中文走打包的思源黑体，最后用系统字体兜底。
+     本机没有苹方，所以冬青黑体（Hiragino Sans GB）放在兜底链最前面。 */
+  --font-sans:
+    "Inter Variable", "Noto Sans SC Variable", "Hiragino Sans GB", "PingFang SC",
+    "Microsoft YaHei", "STHeiti", "Songti SC", system-ui, -apple-system, sans-serif;
+
+  /* 颜色 */
+  --color-ink: #1f2937;
+  --color-ink-muted: #6b7280;
+  --color-ink-soft: #9ca3af;
+  --color-line: #e5e7eb;
+  --color-brand: #2563eb;
+  --color-brand-soft: #eff6ff;
+
+  /* 简历字号（用 pt，和打印出来的物理尺寸一致）
+     一页版要求把全部内容压进 A4 一页，所以字号与行距按「密排」调过：
+     正文 9.5pt / 行距 1.5。纸质上仍是正常简历字号（多数单页简历在 9–10.5pt），
+     每行比原先省约 3.6px，整份下来能省出一两百 px。 */
+  --text-name: 18pt;
+  --text-name--line-height: 1.15;
+  --text-name--letter-spacing: 0.02em;
+
+  --text-heading: 10pt;
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: 0.08em;
+
+  --text-body: 9.5pt;
+  --text-body--line-height: 1.5;
+
+  --text-small: 8.5pt;
+  --text-small--line-height: 1.42;
+
+  --text-micro: 7.5pt;
+  --text-micro--line-height: 1.3;
+}
+
+/* ============================================================================
+ * 基础
+ * ========================================================================== */
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  background: #f3f4f6;
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 细滚动条（编辑区与预览区） */
+.thin-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* ============================================================================
+ * A4 纸张
+ *
+ * 页边距做在 padding 上（而不是 @page margin），这样 Chrome / Safari 表现一致。
+ * ========================================================================== */
+
+.resume-paper {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 14mm;
+  box-sizing: border-box;
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 9.5pt;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgb(16 24 40 / 0.04),
+    0 1px 2px rgb(16 24 40 / 0.06),
+    0 12px 32px -8px rgb(16 24 40 / 0.18);
+}
+
+/* 等宽数字：让右对齐的日期在编辑时不左右跳动 */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ============================================================================
+ * 打印 / 导出 PDF
+ *
+ * 关键点，缺一个就出问题：
+ *   1. 页边距交给 @page margin。做在纸张 padding 上时，内容一旦超过一页，
+ *      只有第 1 页顶部和最后一页底部有边距，中间那些页会顶到纸边。
+ *   2. 应用外壳、编辑器用 display:none 摘掉，不是 visibility:hidden ——
+ *      不可见元素仍然占版面，编辑器内容一长就会凭空多出好几张空白页。
+ *   3. 从 body 到纸张这条链路全部改成普通块流，取消 flex 与滚动容器。
+ *   4. 强制打印背景色，否则模块标题的蓝色下划线会消失。
+ * ========================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print,
+  .app-editor {
+    display: none !important;
+  }
+
+  /* 纸张所在的这条链路：从 flex 布局还原成普通块流 */
+  .app-shell,
+  .app-main,
+  .app-preview,
+  .app-preview-scroll {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border: 0 !important;
+  }
+
+  .resume-paper {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* 一条要点不要被切成两页。
+     注意：不要给整段经历加 break-inside:avoid —— 那段内容一旦超过一页，
+     浏览器会把它整体推到下一页，上一页底部就会空掉一大片。 */
+  .resume-paper li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 模块标题、以及条目头（公司名 + 日期那一行）不要单独留在页底 */
+  .resume-paper section > h2,
+  .resume-paper .entry-head {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
