@@ -350,3 +350,12 @@ pnpm typecheck  # 检查类型错误
 pnpm build      # 生产构建，产物在 dist/
 pnpm preview    # 预览构建产物
 ```
+
+## 开源部署（给自己或别人搭一套）
+
+线上实例：<https://dontttbefly-sketch.github.io/resume-ai/>
+
+- **前端**：push 到 main 自动构建部署 GitHub Pages（见 `.github/workflows/deploy.yml`），无需配置
+- **AI 代理**：`worker/` 目录，`npx wrangler deploy` 三个命令（见 `worker/README.md`）；API key 和邀请码都在 Cloudflare Secrets 里
+- **云同步**（可选）：自建一个 Supabase 项目，建一张 `resumes` 表（SQL 见 worker/README.md），设 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 即可替换内置实例
+- **私有数据**：`src/data/private/` 与 `public/private/` 不进仓库，想放自己的真实简历看 `src/data/privateResume.ts` 的说明
