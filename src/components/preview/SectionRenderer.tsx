@@ -24,7 +24,11 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
 
   const name = joinValues(entry, fieldsByRole(desc, "primary"));
   const title = joinValues(entry, fieldsByRole(desc, "secondary"));
-  const metas = fieldsByRole(desc, "meta")
+  const metaFields = fieldsByRole(desc, "meta");
+  const portfolioField = metaFields.find((f) => f.key === "portfolio");
+  const portfolio = portfolioField ? asString(entry.values[portfolioField.key]).trim() : "";
+  const metas = metaFields
+    .filter((f) => f.key !== "portfolio")
     .map((f) => asString(entry.values[f.key]).trim())
     .filter(Boolean);
   const body = joinValues(entry, fieldsByRole(desc, "body"), "\n");
@@ -40,6 +44,9 @@ function HeaderLayout({ desc, entries }: { desc: SectionDescriptor; entries: Ent
           {title && <p className="mt-0.5 text-heading font-semibold text-brand">{title}</p>}
           {metas.length > 0 && (
             <p className="tnum mt-1 text-small text-ink-muted">{metas.join(" · ")}</p>
+          )}
+          {portfolio && (
+            <p className="mt-0.5 text-small text-ink-muted">作品集 · {portfolio}</p>
           )}
           {body && <p className="mt-1 whitespace-pre-line text-body text-ink">{body}</p>}
         </div>

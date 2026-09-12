@@ -18,17 +18,6 @@ function useQrCode(): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-/** 页脚：作品集二维码（17mm，右下角，与说明小字并排；17mm 是实测可扫下限） */
-function FooterQr({ qr }: { qr: string }) {
-  if (!qr) return null;
-  return (
-    <footer className="mt-[2px] flex items-center justify-end gap-2.5 border-t border-line pt-[3px]">
-      <p className="text-small text-ink-muted">作品集 · 扫码即达</p>
-      <img src={qr} alt="" className="h-[17mm] w-[17mm] shrink-0" />
-    </footer>
-  );
-}
-
 export function ResumeDocument() {
   const sections = useResumeStore((s) => s.sections);
   const visibility = useResumeStore((s) => s.visibility);
@@ -44,6 +33,28 @@ export function ResumeDocument() {
         if (isEmptySection(desc, entries)) return null;
 
         const isHeader = desc.layout === "header";
+        const isSkills = desc.key === "skills";
+
+        if (isSkills) {
+          return (
+            <section key={desc.key} className="mt-[2px]">
+              <h2 className="mb-0.5 text-heading font-semibold text-ink">
+                <span className="border-b-2 border-brand pb-px">{desc.label}</span>
+              </h2>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <SectionBody desc={desc} entries={entries} />
+                </div>
+                {qr && (
+                  <div className="flex shrink-0 flex-col items-center gap-0.5">
+                    <img src={qr} alt="" className="h-[15mm] w-[15mm]" />
+                    <p className="text-micro text-ink-muted">作品集</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        }
 
         return (
           <section key={desc.key} className={isHeader ? "" : "mt-[2px]"}>
@@ -56,7 +67,6 @@ export function ResumeDocument() {
           </section>
         );
       })}
-      <FooterQr qr={qr} />
     </div>
   );
 }
