@@ -181,49 +181,132 @@ function AvatarMenu() {
   );
 }
 
-/* ------------------------- 档案切换（紧凑） ------------------------- */
+/* ------------------------- 档案：文档名风格（无框） ------------------------- */
 
-function ProfileBar() {
+function ProfileMenu() {
   const profiles = useResumeStore((s) => s.profiles);
   const activeId = useResumeStore((s) => s.activeId);
   const createProfile = useResumeStore((s) => s.createProfile);
   const duplicateProfile = useResumeStore((s) => s.duplicateProfile);
+  const renameProfile = useResumeStore((s) => s.renameProfile);
+  const deleteProfile = useResumeStore((s) => s.deleteProfile);
   const switchProfile = useResumeStore((s) => s.switchProfile);
 
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   const full = profiles.length >= MAX_PROFILES;
+  const last = profiles.length <= 1;
+  const active = profiles.find((p) => p.id === activeId);
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [open]);
 
   return (
-    <div className="flex items-center gap-1">
-      <select
-        value={activeId}
-        onChange={(e) => switchProfile(e.target.value)}
+    <div ref={ref} className="relative">
+      {/* 触发器：文档名风格，无框 */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[14px] font-semibold tracking-tight text-slate-800 transition-colors duration-100 hover:bg-slate-100"
         title="切换简历档案"
-        className="cursor-pointer rounded-lg border border-slate-200/70 bg-white/60 px-2 py-1 text-[12px] text-slate-600 outline-none backdrop-blur transition-colors hover:border-slate-300 focus:border-sky-300"
       >
-        {profiles.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        title={full ? `最多 ${MAX_PROFILES} 份` : "新建档案"}
-        disabled={full}
-        onClick={() => createProfile()}
-        className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 active:scale-90 disabled:opacity-30"
-      >
-        +
+        {active?.name ?? "简历"}
+        <span
+          className={
+            "text-[9px] text-slate-400 transition-transform duration-200 " + (open ? "rotate-180" : "")
+          }
+        >
+          ▾
+        </span>
       </button>
-      <button
-        type="button"
-        title={full ? "档案已满" : "复制当前档案"}
-        disabled={full}
-        onClick={() => void duplicateProfile()}
-        className="flex h-6 w-6 items-center justify-center rounded-lg text-[11px] text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 active:scale-90 disabled:opacity-30"
-      >
-        ⧉
-      </button>
+
+      {open && (
+        <div className="absolute left-0 top-11 z-50 w-60 origin-top-left overflow-hidden rounded-2xl border border-slate-200/70 bg-white/95 p-1.5 shadow-[0_4px_12px_rgba(15,23,42,0.08),0_16px_48px_rgba(15,23,42,0.14)] backdrop-blur-2xl animate-[vault-fade-in_160ms_ease-out]">
+          {profiles.map((p) => {
+            const isActive = p.id === activeId;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  switchProfile(p.id);
+                  setOpen(false);
+                }}
+                className={
+                  "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors duration-100 " +
+                  (isActive
+                    ? "bg-gradient-to-r from-violet-50 to-sky-50 font-semibold text-slate-800"
+                    : "text-slate-600 hover:bg-slate-100")
+                }
+              >
+                <span className="truncate">{p.name}</span>
+                {isActive && (
+                  <span className="ml-2 shrink-0 text-[11px] text-sky-500">✓</span>
+                )}
+              </button>
+            );
+          })}
+
+          <div className="my-1.5 h-px bg-slate-100" />
+
+          <button
+            type="button"
+            disabled={full}
+            onClick={() => {
+              if (full) return;
+              if (window.confirm("新建并切换到一份空白简历，当前内容保留在原档案。继续吗？")) createProfile();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-30"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-[11px] text-slate-500">+</span>
+            新建简历
+            <span className="tnum ml-auto text-[10px] text-slate-300">{profiles.length}/{MAX_PROFILES}</span>
+          </button>
+          <button
+            type="button"
+            disabled={full}
+            onClick={() => {
+              void duplicateProfile();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-30"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-[10px] text-slate-500">⧉</span>
+            复制当前
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const name = window.prompt("档案名称", active?.name ?? "");
+              if (name !== null) renameProfile(name);
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-slate-600 transition-colors hover:bg-slate-100"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-[10px] text-slate-500">✎</span>
+            重命名
+          </button>
+          <button
+            type="button"
+            disabled={last}
+            onClick={() => {
+              if (last) return;
+              if (window.confirm(`删除「${active?.name}」？这份简历的全部内容会一起删掉。`)) deleteProfile();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-30"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-rose-50 text-[10px] text-rose-400">🗑</span>
+            删除
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -241,17 +324,16 @@ export function Toolbar() {
 
   return (
     <header className="no-print relative z-30 flex h-12 shrink-0 items-center gap-3 border-b border-slate-200/60 bg-white/70 px-4 backdrop-blur-xl">
-      {/* Logo */}
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-[10px] bg-gradient-to-br from-violet-500 via-indigo-500 to-sky-400 text-[13px] font-bold text-white shadow-[0_2px_8px_rgba(99,102,241,0.35)]">
+      {/* Logo + 简历名（文档名风格：名称即档案，点击切换） */}
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-violet-500 via-indigo-500 to-sky-400 text-[13px] font-bold text-white shadow-[0_2px_8px_rgba(99,102,241,0.35)]">
           简
         </span>
-        <span className="text-[13px] font-semibold tracking-tight text-slate-700">简历工作台</span>
-      </div>
-
-      {/* 档案 */}
-      <div className="hidden md:flex">
-        <ProfileBar />
+        <div className="flex items-center gap-2.5 leading-tight">
+          <ProfileMenu />
+          <span className="hidden h-3.5 w-px bg-slate-200 sm:block" />
+          <span className="hidden text-[10.5px] text-slate-400 sm:block">简历工作台</span>
+        </div>
       </div>
 
       {/* 右侧 */}
