@@ -314,7 +314,7 @@ function ProfileMenu() {
 /* ------------------------------ 顶栏 ------------------------------ */
 
 export function Toolbar() {
-  const openFull = useSelectionStore((s) => s.openFull);
+  const openFull = useSelectionStore((s) => s.open);
   const [guideOpen, setGuideOpen] = useState(false);
 
   const requestExport = () => {

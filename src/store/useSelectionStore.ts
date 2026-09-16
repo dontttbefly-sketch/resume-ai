@@ -1,16 +1,15 @@
 /* ============================================================================
- * 选择状态：用户在简历预览上点选了什么（AI 改进的上下文）
+ * 选区状态：支持多选（点段落 = 添加/移除一个选区标签）
  *
- * 面板双模式（见 9-16 讨论定稿）：
- *   compact（局部编辑）：点简历段落触发 → 矮面板，只改进当前选区
- *   full（AI 聊天）：点顶栏 ✦AI 触发 → 高面板，自由对话（聊简历/经历）
- *   null：关闭
+ * 模式（9-16 第三轮定稿）：
+ *   只有一种面板：full 高面板（自由聊）
+ *   选中段落 → 在输入框上方挂彩色「选区标签」（#公司名·第N条 ✕）
+ *   点空白 → 清空选区 + 关面板
  * ========================================================================== */
 
 import { create } from "zustand";
 
 export type SelectionLevel = "section" | "entry" | "bullet";
-export type PanelMode = "compact" | "full" | null;
 
 export interface Selection {
   level: SelectionLevel;
@@ -20,39 +19,54 @@ export interface Selection {
   entryLabel?: string;
   bulletIndex?: number;
   bulletText?: string;
+  /** 稳定 key（去重用） */
+  key: string;
 }
 
 interface SelectionState {
-  selection: Selection | null;
-  /** null = 面板关闭；compact = 局部编辑矮面板；full = AI 聊天高面板 */
-  panelMode: PanelMode;
-  /** AI 正在处理 → 选区高斯模糊 */
+  /** 当前所有选区（多选） */
+  selections: Selection[];
+  panelOpen: boolean;
   thinking: boolean;
-  /** 经历库浮窗 */
   vaultOpen: boolean;
 
-  /** 点选简历段落 → compact 模式 */
-  select: (s: Selection) => void;
-  /** 点顶栏 AI → full 模式 */
-  openFull: () => void;
-  /** 解除选区关联（面板转 full 自由聊） */
-  detach: () => void;
-  /** 关闭面板 + 清选区 */
+  /** 点选一个块：已选则移除，未选则添加；同时打开面板 */
+  toggle: (s: Selection) => void;
+  /** 移除一个选区 */
+  remove: (key: string) => void;
+  /** 清空全部选区 */
+  clearSelections: () => void;
+  /** 打开面板（顶栏 AI） */
+  open: () => void;
+  /** 关闭面板 + 清空选区 */
   close: () => void;
   setThinking: (v: boolean) => void;
   setVaultOpen: (v: boolean) => void;
 }
 
 export const useSelectionStore = create<SelectionState>()((set) => ({
-  selection: null,
-  panelMode: null,
+  selections: [],
+  panelOpen: false,
   thinking: false,
   vaultOpen: false,
 
-  select: (s) => set({ selection: s, panelMode: "compact" }),
-  openFull: () => set({ panelMode: "full" }),
-  detach: () => set({ selection: null, panelMode: "full" }),
-  close: () => set({ selection: null, panelMode: null }),
+  toggle: (s) =>
+    set((st) => {
+      const exists = st.selections.some((x) => x.key === s.key);
+      return {
+        selections: exists ? st.selections.filter((x) => x.key !== s.key) : [...st.selections, s],
+        panelOpen: true,
+      };
+    }),
+  remove: (key) => set((st) => ({ selections: st.selections.filter((x) => x.key !== key) })),
+  clearSelections: () => set({ selections: [] }),
+  open: () => set({ panelOpen: true }),
+  close: () => set({ selections: [], panelOpen: false }),
   setThinking: (v) => set({ thinking: v }),
   setVaultOpen: (v) => set({ vaultOpen: v }),
 }));
+
+/** 生成稳定 key */
+export function selectionKey(s: Omit<Selection, "key">): string {
+  return `${s.sectionKey}:${s.entryId ?? "-"}:${s.bulletIndex ?? "-"}`;
+}
