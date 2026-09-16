@@ -167,6 +167,46 @@ export function AiPanel() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
+  /* ---------- 锚点：compact 面板垂直对齐到被选中的段落（像批注贴在旁边） ---------- */
+  const [anchorTop, setAnchorTop] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!compact || !selection) {
+      setAnchorTop(null);
+      return;
+    }
+    const PANEL_H = Math.min(Math.round(window.innerHeight * 0.62), 520);
+    let scrolled = false;
+    const place = (r: DOMRect) =>
+      setAnchorTop(Math.round(Math.max(60, Math.min(r.top - 12, window.innerHeight - PANEL_H - 16))));
+    const calc = () => {
+      const el = document.querySelector(".block-selected");
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      /* 段落不在视口内 → 先居中滚动，让用户看到它，再定位面板 */
+      if (!scrolled && (r.top < 60 || r.bottom > window.innerHeight - 60)) {
+        scrolled = true;
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        window.setTimeout(() => {
+          const r2 = el.getBoundingClientRect();
+          place(r2);
+        }, 450);
+        return;
+      }
+      place(r);
+    };
+    calc();
+    /* 选区渲染晚一拍（PreviewPanel 的 effect 才加类），再算一次 */
+    const t = window.setTimeout(calc, 80);
+    window.addEventListener("scroll", calc, true);
+    window.addEventListener("resize", calc);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("scroll", calc, true);
+      window.removeEventListener("resize", calc);
+    };
+  }, [compact, selection, thinking]);
+
   const placeholder = useMemo(() => {
     if (thinking) return "AI 正在思考…";
     if (selection && compact) return "说说哪里不满意…";
@@ -263,8 +303,16 @@ export function AiPanel() {
   return (
     <aside
       className={
-        "ai-panel no-print fixed right-4 z-40 flex w-[380px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/[0.93] shadow-[0_2px_8px_rgba(15,23,42,0.06),0_12px_40px_rgba(15,23,42,0.14)] backdrop-blur-2xl animate-[ai-slide-in_280ms_cubic-bezier(0.32,0.72,0,1)] " +
-        (compact ? "bottom-6 max-h-[46vh]" : "top-14 bottom-4")
+        "ai-panel no-print fixed right-4 z-40 flex w-[380px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/[0.93] shadow-[0_2px_8px_rgba(15,23,42,0.06),0_12px_40px_rgba(15,23,42,0.14)] backdrop-blur-2xl transition-[top] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] animate-[ai-slide-in_280ms_cubic-bezier(0.32,0.72,0,1)] " +
+        (compact ? "" : "top-14 bottom-4")
+      }
+      style={
+        compact
+          ? {
+              top: anchorTop ?? 80,
+              height: "min(62vh, 520px)",
+            }
+          : undefined
       }
     >
       {/* 头部：上下文 */}
@@ -389,7 +437,7 @@ export function AiPanel() {
         <div className="flex items-end gap-2 rounded-2xl bg-white p-1.5 shadow-inner ring-1 ring-slate-200/70 transition-shadow focus-within:ring-2 focus-within:ring-sky-300/60">
           <textarea
             value={input}
-            rows={compact ? 1 : 2}
+            rows={compact ? 2 : 3}
             placeholder={placeholder}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -398,7 +446,7 @@ export function AiPanel() {
                 submit();
               }
             }}
-            className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12.5px] leading-relaxed text-slate-700 outline-none placeholder:text-slate-300"
+            className="max-h-32 min-h-[52px] flex-1 resize-none bg-transparent px-2 py-2 text-[12.5px] leading-relaxed text-slate-700 outline-none placeholder:text-slate-300"
           />
           <button
             type="button"
