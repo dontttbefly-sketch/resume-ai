@@ -15,11 +15,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { chat, LlmError } from "../../lib/llm";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { useResumeStore } from "../../store/useResumeStore";
+import { useExperienceStore } from "../../store/useExperienceStore";
 import { SECTION_MAP } from "../../data/sections";
 
 interface Candidate {
   text?: string;
   reason?: string;
+}
+
+interface ExtractedExp {
+  company: string;
+  project: string;
+  summary: string;
 }
 
 interface Msg {
@@ -28,6 +35,9 @@ interface Msg {
   candidates?: Candidate[];
   appliedIndex?: number;
   error?: boolean;
+  /** 自由聊里挖掘到的经历（可一键存入经历库） */
+  exp?: ExtractedExp;
+  expSaved?: boolean;
 }
 
 /* ---------- 思考话术：分阶段 + 随机轮换（每秒一条，不重复） ---------- */
@@ -112,6 +122,13 @@ const RULES = `【简历口径规范（必须遵守）】
 - 成果导向：动词开头（搭建/设计/开发/主导），不写"负责"
 - 一句话一条信息，不啰嗦`;
 
+/* 自由聊的示例提示（点击填入输入框） */
+const SUGGESTIONS = [
+  "我在蓝禾还做过一个直播巡检系统…",
+  "帮我判断这份简历适合投什么岗",
+  "有段经历没写进简历，想补上",
+];
+
 const SYSTEM_IMPROVE = `你是一位顶级简历优化专家，帮用户改进简历的一个片段。
 
 ${RULES}
@@ -131,9 +148,12 @@ const SYSTEM_CHAT = `你是用户的简历顾问，帮他把简历做好、挖�
 ${RULES}
 
 用户会跟你聊简历的想法、他的经历、求职方向。自然地对话：
-- 如果用户透露了值得写进简历的经历，帮他提炼（公司名/项目名/摘要）
 - 回复简洁，不说套话，直接给有用的内容
-- 普通文本回复即可，不需要 JSON`;
+- 普通文本回复即可，不需要 JSON
+
+【经历沉淀】如果用户这段话透露了一段值得写进简历的具体经历（有公司/项目/成果），
+请在回复的最后**另起一行**附上这一行标记（没有新经历就不要加）：
+<<EXP:公司名|项目名|一句话摘要>>`;
 
 export function AiPanel() {
   const panelMode = useSelectionStore((s) => s.panelMode);
@@ -145,6 +165,7 @@ export function AiPanel() {
 
   const setBullet = useResumeStore((s) => s.setBullet);
   const sections = useResumeStore((s) => s.sections);
+  const addExperience = useExperienceStore((s) => s.addItem);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -275,7 +296,18 @@ export function AiPanel() {
             : { role: "assistant", text: reply.trim() || "（空回复）" },
         ]);
       } else {
-        setMessages((prev) => [...prev, { role: "assistant", text: reply.trim() }]);
+        /* 自由聊：解析可能附带的新经历标记 <<EXP:公司|项目|摘要>> */
+        const expMatch = reply.match(/<<EXP:(.+?)>>/);
+        let exp: ExtractedExp | undefined;
+        let clean = reply;
+        if (expMatch) {
+          const parts = expMatch[1].split("|").map((x) => x.trim());
+          if (parts[0]) {
+            exp = { company: parts[0] ?? "", project: parts[1] ?? "", summary: parts[2] ?? "" };
+          }
+          clean = reply.replace(/<<EXP:.*?>>/g, "").trim();
+        }
+        setMessages((prev) => [...prev, { role: "assistant", text: clean, exp }]);
       }
     } catch (err) {
       const msg = err instanceof LlmError ? err.message : err instanceof Error ? err.message : "调用失败";
@@ -349,13 +381,41 @@ export function AiPanel() {
       {/* 消息流 */}
       <div ref={listRef} className="thin-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length === 0 && !thinking && (
-          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-center">
-            <span className="text-[12px] leading-relaxed text-slate-400">
-              {selection && compact
-                ? "说说哪里不满意，比如「太啰嗦」「换个角度」「更有冲击力」"
-                : "跟我聊简历、聊经历，我来帮你打磨"}
-            </span>
-          </div>
+          selection && compact ? (
+            <div className="flex h-full flex-col items-center justify-center gap-1.5 text-center">
+              <span className="text-[12px] leading-relaxed text-slate-400">
+                说说哪里不满意，比如「太啰嗦」「换个角度」「更有冲击力」
+              </span>
+            </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-1 text-center">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-sky-400 text-[18px] text-white shadow-[0_4px_16px_rgba(99,102,241,0.35)]">
+                ✦
+              </span>
+              <div>
+                <p className="text-[13.5px] font-semibold text-slate-700">跟我聊聊，让我更懂你</p>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-slate-400">
+                  你说的每段经历我都会沉淀进
+                  <span className="font-medium text-violet-500">经历库</span>
+                  ，写简历时自动引用
+                  <br />
+                  —— 聊得越多，我越能写出像你的简历
+                </p>
+              </div>
+              <div className="mt-0.5 flex w-full max-w-[290px] flex-col gap-1.5">
+                {SUGGESTIONS.map((sg) => (
+                  <button
+                    key={sg}
+                    type="button"
+                    onClick={() => setInput(sg)}
+                    className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-left text-[11.5px] text-slate-500 transition-all duration-150 hover:border-violet-300 hover:bg-violet-50/70 hover:text-violet-600 active:scale-[0.98]"
+                  >
+                    {sg}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
         )}
         {messages.map((m, i) =>
           m.role === "user" ? (
@@ -375,6 +435,35 @@ export function AiPanel() {
                 >
                   {m.text}
                 </p>
+              )}
+              {/* 挖掘到的经历 → 确认后存入经历库 */}
+              {m.exp && (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50/70 px-3.5 py-2.5">
+                  <p className="text-[10.5px] font-medium text-violet-500">✦ 检测到一段新经历</p>
+                  <p className="mt-1 text-[12.5px] font-semibold text-slate-800">
+                    {m.exp.company}
+                    {m.exp.project ? ` · ${m.exp.project}` : ""}
+                  </p>
+                  {m.exp.summary && (
+                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">{m.exp.summary}</p>
+                  )}
+                  {m.expSaved ? (
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-0.5 text-[10.5px] font-medium text-violet-600">
+                      ✓ 已存入经历库
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addExperience({ company: m.exp!.company, project: m.exp!.project, summary: m.exp!.summary });
+                        setMessages((prev) => prev.map((mm, i) => (i === messages.indexOf(m) ? { ...mm, expSaved: true } : mm)));
+                      }}
+                      className="mt-2 rounded-full bg-gradient-to-r from-violet-500 to-sky-400 px-3 py-1 text-[11px] font-medium text-white shadow-sm transition-all hover:brightness-110 active:scale-95"
+                    >
+                      存入经历库
+                    </button>
+                  )}
+                </div>
               )}
               {m.candidates?.map((c, ci) => (
                 <div
