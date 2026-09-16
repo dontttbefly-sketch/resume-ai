@@ -1,21 +1,21 @@
 /* ============================================================================
- * AI 工作面板（右侧浮动）
+ * AI 面板（双模式）
  *
- * 状态机：
- *   selection 有值 → 【改进模式】点选了简历的某块，对话即改进指令
- *   selection 空   → 【倾听模式】听用户聊经历，挖掘后建议写入
+ *   compact（局部编辑）：点简历段落触发 → 矮面板，改进当前选区
+ *   full（AI 聊天）：点顶栏 ✦AI → 高面板，自由对话（简历 / 经历库相关）
  *
- * 动效：
- *   - 滑出/收回：transform + opacity，280ms 苹果曲线
- *   - thinking：选区高斯模糊（由 PreviewPanel 联动）+ 面板内文字呼吸轮播
- *   - 应用成功：候选卡变绿 + "已应用"徽标
+ * 交互细节（9-16 定稿）：
+ *   - Enter 发送 / Shift+Enter 换行
+ *   - 对话上下文跨选区保留
+ *   - 思考话术：分阶段 + 随机轮换，每秒一句，让等待有「持续在推进」的感觉
+ *   - compact 可「转自由聊」（解除选区关联 → full）
  * ========================================================================== */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { chat, LlmError } from "../../lib/llm";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { useResumeStore } from "../../store/useResumeStore";
-import { SECTION_MAP, type SectionKey } from "../../data/sections";
+import { SECTION_MAP } from "../../data/sections";
 
 interface Candidate {
   text?: string;
@@ -30,18 +30,94 @@ interface Msg {
   error?: boolean;
 }
 
-const THINKING_STEPS = ["正在思考…", "正在回忆你的经历库…", "找到了几种改法…", "正在打磨文案…", "快好了…"];
+/* ---------- 思考话术：分阶段 + 随机轮换（每秒一条，不重复） ---------- */
 
-const SYSTEM_PROMPT = `你是一位顶级简历优化专家，帮用户改进简历的一个片段。
+const THINKING_PHASES: { until: number; lines: string[] }[] = [
+  {
+    until: 5,
+    lines: [
+      "正在理解你的想法…",
+      "在读你选的这段…",
+      "分析你的反馈…",
+      "拆解一下需求…",
+      "想想从哪入手…",
+    ],
+  },
+  {
+    until: 12,
+    lines: [
+      "正在翻你的经历库…",
+      "回忆相关素材…",
+      "查找可引用的经历…",
+      "联想类似的表达…",
+      "对照简历口径…",
+    ],
+  },
+  {
+    until: 22,
+    lines: [
+      "正在起草候选…",
+      "换一个角度试试…",
+      "尝试更犀利的写法…",
+      "调整一下结构…",
+      "考虑换个动词开头…",
+      "量化结果往前放…",
+    ],
+  },
+  {
+    until: 40,
+    lines: [
+      "正在打磨措辞…",
+      "最后润色…",
+      "检查口径规范…",
+      "快好了…",
+      "马上完成…",
+      "做最后检查…",
+    ],
+  },
+];
 
-【简历口径规范（必须遵守）】
+function useThinkingLine(thinking: boolean) {
+  const [line, setLine] = useState(THINKING_PHASES[0].lines[0]);
+  const lastRef = useRef("");
+  const startRef = useRef(0);
+
+  useEffect(() => {
+    if (!thinking) return;
+    startRef.current = Date.now();
+    setLine(THINKING_PHASES[0].lines[0]);
+    lastRef.current = "";
+
+    const timer = setInterval(() => {
+      const elapsed = (Date.now() - startRef.current) / 1000;
+      const phase =
+        THINKING_PHASES.find((p) => elapsed < p.until) ?? THINKING_PHASES[THINKING_PHASES.length - 1];
+      const pool = phase.lines.filter((l) => l !== lastRef.current);
+      const next = pool[Math.floor(Math.random() * pool.length)];
+      lastRef.current = next;
+      setLine(next);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [thinking]);
+
+  return line;
+}
+
+/* ---------- Prompt ---------- */
+
+const RULES = `【简历口径规范（必须遵守）】
 - 结论收尾：每条要点的结论/成果放在句尾，用「——」连接
 - 厉害但不晦涩：术语配人话，量化数字让外行秒懂
 - 成果导向：动词开头（搭建/设计/开发/主导），不写"负责"
-- 一句话一条信息，不啰嗦
+- 一句话一条信息，不啰嗦`;
+
+const SYSTEM_IMPROVE = `你是一位顶级简历优化专家，帮用户改进简历的一个片段。
+
+${RULES}
 
 【输出要求】
-只返回 JSON，不要任何其他文字，格式：
+只返回 JSON，不要任何其他文字：
 {
   "candidates": [
     { "text": "改进后的完整内容", "reason": "一句话说明为什么这么改" },
@@ -50,57 +126,56 @@ const SYSTEM_PROMPT = `你是一位顶级简历优化专家，帮用户改进简
 }
 给 2-3 个风格不同的候选。`;
 
+const SYSTEM_CHAT = `你是用户的简历顾问，帮他把简历做好、挖掘他的经历。
+
+${RULES}
+
+用户会跟你聊简历的想法、他的经历、求职方向。自然地对话：
+- 如果用户透露了值得写进简历的经历，帮他提炼（公司名/项目名/摘要）
+- 回复简洁，不说套话，直接给有用的内容
+- 普通文本回复即可，不需要 JSON`;
+
 export function AiPanel() {
-  const aiOpen = useSelectionStore((s) => s.aiOpen);
-  const setAiOpen = useSelectionStore((s) => s.setAiOpen);
+  const panelMode = useSelectionStore((s) => s.panelMode);
   const selection = useSelectionStore((s) => s.selection);
   const thinking = useSelectionStore((s) => s.thinking);
   const setThinking = useSelectionStore((s) => s.setThinking);
+  const detach = useSelectionStore((s) => s.detach);
+  const close = useSelectionStore((s) => s.close);
 
   const setBullet = useResumeStore((s) => s.setBullet);
   const sections = useResumeStore((s) => s.sections);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [step, setStep] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const thinkingLine = useThinkingLine(thinking);
+
+  const compact = panelMode === "compact";
 
   /* Esc 关闭 */
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAiOpen(false);
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
-  }, [setAiOpen]);
-
-  /* thinking 时文字轮播 */
-  useEffect(() => {
-    if (!thinking) return;
-    setStep(0);
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, THINKING_STEPS.length - 1)), 6000);
-    return () => clearInterval(t);
-  }, [thinking]);
+  }, [close]);
 
   /* 消息滚动到底 */
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
-  /* 换选区 → 清空对话 */
-  useEffect(() => {
-    setMessages([]);
-  }, [selection?.level, selection?.entryId, selection?.bulletIndex]);
-
-  if (!aiOpen) return null;
+  if (!panelMode) return null;
 
   const contextLabel = selection
     ? selection.level === "bullet"
-      ? `${selection.sectionLabel} · ${selection.entryLabel} · 第 ${(selection.bulletIndex ?? 0) + 1} 条`
+      ? `${selection.entryLabel} · 第 ${(selection.bulletIndex ?? 0) + 1} 条`
       : selection.level === "entry"
-        ? `${selection.sectionLabel} · ${selection.entryLabel}`
+        ? `${selection.entryLabel}（整段）`
         : selection.sectionLabel
-    : "";
+    : "自由对话";
 
   async function submit() {
     const feedback = input.trim();
@@ -109,10 +184,12 @@ export function AiPanel() {
     setMessages((m) => [...m, { role: "user", text: feedback }]);
     setThinking(true);
 
+    const isImprove = !!selection && compact;
     try {
-      let userContent = "";
-      if (selection) {
-        const secLabel = (SECTION_MAP as Record<string, { label: string }>)[selection.sectionKey]?.label ?? selection.sectionKey;
+      let userContent: string;
+      if (isImprove && selection) {
+        const secLabel =
+          (SECTION_MAP as Record<string, { label: string }>)[selection.sectionKey]?.label ?? selection.sectionKey;
         if (selection.level === "bullet") {
           userContent = `【模块】${secLabel}\n【条目】${selection.entryLabel}\n【当前这条内容】${selection.bulletText}\n\n【用户反馈】${feedback}`;
         } else if (selection.level === "entry") {
@@ -120,40 +197,42 @@ export function AiPanel() {
           const bullets = (entry?.values.bullets as string[] | undefined) ?? [];
           userContent = `【模块】${secLabel}\n【条目】${selection.entryLabel}\n【当前全部要点】\n${bullets.map((b, i) => `${i + 1}. ${b}`).join("\n")}\n\n【用户反馈】${feedback}`;
         } else {
-          userContent = `【模块】${secLabel}（用户想改进整个模块）\n【用户反馈】${feedback}\n\n请给整块改进的建议候选（每个候选为一段完整的要点组合）。`;
+          userContent = `【模块】${secLabel}（用户想改进整个模块）\n【用户反馈】${feedback}\n\n请给整块改进的候选。`;
         }
       } else {
-        userContent = `用户正在聊自己的经历（无选中上下文）：${feedback}\n\n请认真倾听并回应；如果用户透露了值得写进简历的经历，帮他提炼并给出简历化的表述候选。`;
+        userContent = feedback;
       }
 
       const reply = await chat(
         [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: isImprove ? SYSTEM_IMPROVE : SYSTEM_CHAT },
           { role: "user", content: userContent },
         ],
-        { temperature: 0.8 },
+        { temperature: isImprove ? 0.8 : 0.7 },
       );
 
-      /* 宽松解析 JSON */
-      let candidates: Candidate[] = [];
-      const m = reply.match(/\{[\s\S]*\}/);
-      if (m) {
-        try {
-          const parsed = JSON.parse(m[0]);
-          if (Array.isArray(parsed.candidates)) candidates = parsed.candidates.slice(0, 4);
-        } catch {
-          /* 非结构化 → 当纯文本 */
+      if (isImprove) {
+        let candidates: Candidate[] = [];
+        const m = reply.match(/\{[\s\S]*\}/);
+        if (m) {
+          try {
+            const parsed = JSON.parse(m[0]);
+            if (Array.isArray(parsed.candidates)) candidates = parsed.candidates.slice(0, 4);
+          } catch {
+            /* 非结构化 → 当纯文本 */
+          }
         }
+        setMessages((prev) => [
+          ...prev,
+          candidates.length > 0
+            ? { role: "assistant", text: "", candidates }
+            : { role: "assistant", text: reply.trim() || "（空回复）" },
+        ]);
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", text: reply.trim() }]);
       }
-      setMessages((prev) => [
-        ...prev,
-        candidates.length > 0
-          ? { role: "assistant", text: "", candidates }
-          : { role: "assistant", text: reply.trim() || "（空回复）" },
-      ]);
     } catch (err) {
-      const msg =
-        err instanceof LlmError ? err.message : err instanceof Error ? err.message : "调用失败";
+      const msg = err instanceof LlmError ? err.message : err instanceof Error ? err.message : "调用失败";
       setMessages((prev) => [...prev, { role: "assistant", text: `⚠️ ${msg}`, error: true }]);
     } finally {
       setThinking(false);
@@ -163,20 +242,11 @@ export function AiPanel() {
   function applyCandidate(idx: number, text: string) {
     if (!selection) return;
     if (selection.level === "bullet") {
-      setBullet(
-        selection.sectionKey as SectionKey,
-        selection.entryId!,
-        "bullets",
-        selection.bulletIndex!,
-        text,
-      );
+      setBullet(selection.sectionKey as never, selection.entryId!, "bullets", selection.bulletIndex!, text);
     } else if (selection.level === "entry") {
-      /* entry 级候选可能是一整段（按行拆为多条要点） */
       const lines = text.split("\n").map((l) => l.replace(/^\d+[.、]\s*/, "").trim()).filter(Boolean);
-      const entry = sections[selection.sectionKey]?.find((e) => e.id === selection.entryId);
-      const old = ((entry?.values.bullets as string[] | undefined) ?? []).slice();
       lines.forEach((line, i) => {
-        if (i < old.length) setBullet(selection.sectionKey as SectionKey, selection.entryId!, "bullets", i, line);
+        setBullet(selection.sectionKey as never, selection.entryId!, "bullets", i, line);
       });
     }
     setMessages((prev) =>
@@ -184,29 +254,43 @@ export function AiPanel() {
     );
   }
 
+  const placeholder = useMemo(() => {
+    if (thinking) return "AI 正在思考…";
+    if (selection && compact) return "说说哪里不满意…";
+    return "聊聊简历、经历…";
+  }, [thinking, selection, compact]);
+
   return (
-    <aside className="ai-panel no-print fixed bottom-4 right-4 top-16 z-40 flex w-[380px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/[0.92] shadow-[0_2px_8px_rgba(15,23,42,0.06),0_12px_40px_rgba(15,23,42,0.14)] backdrop-blur-2xl animate-[ai-slide-in_280ms_cubic-bezier(0.32,0.72,0,1)]">
+    <aside
+      className={
+        "ai-panel no-print fixed right-4 z-40 flex w-[380px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/[0.93] shadow-[0_2px_8px_rgba(15,23,42,0.06),0_12px_40px_rgba(15,23,42,0.14)] backdrop-blur-2xl animate-[ai-slide-in_280ms_cubic-bezier(0.32,0.72,0,1)] " +
+        (compact ? "bottom-6 max-h-[46vh]" : "top-14 bottom-4")
+      }
+    >
       {/* 头部：上下文 */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-4 py-3">
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-4 py-2.5">
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-sky-500 text-[11px] text-white shadow-sm">
           ✦
         </span>
         <div className="min-w-0 flex-1">
-          {selection ? (
-            <>
-              <p className="truncate text-[13px] font-semibold text-slate-700">改进这段内容</p>
-              <p className="truncate text-[11px] text-slate-400">{contextLabel}</p>
-            </>
-          ) : (
-            <>
-              <p className="text-[13px] font-semibold text-slate-700">和 AI 聊聊</p>
-              <p className="text-[11px] text-slate-400">说说你的经历，或对简历的想法</p>
-            </>
-          )}
+          <p className="truncate text-[12.5px] font-semibold text-slate-700">
+            {selection && compact ? "改进这段" : "AI 简历顾问"}
+          </p>
+          <p className="truncate text-[10.5px] text-slate-400">{contextLabel}</p>
         </div>
+        {selection && compact && (
+          <button
+            type="button"
+            onClick={detach}
+            className="rounded-full px-2 py-0.5 text-[10.5px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            title="不聊这段了，转自由对话"
+          >
+            转自由聊
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => setAiOpen(false)}
+          onClick={close}
           className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 active:scale-90"
           title="关闭（Esc）"
         >
@@ -217,11 +301,11 @@ export function AiPanel() {
       {/* 消息流 */}
       <div ref={listRef} className="thin-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length === 0 && !thinking && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <span className="text-[13px] text-slate-400">
-              {selection
-                ? "说说哪里不满意，比如「太啰嗦」「不够有冲击力」「换个角度」"
-                : "点击简历的任意段落开始改进，或直接和我聊"}
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-center">
+            <span className="text-[12px] leading-relaxed text-slate-400">
+              {selection && compact
+                ? "说说哪里不满意，比如「太啰嗦」「换个角度」「更有冲击力」"
+                : "跟我聊简历、聊经历，我来帮你打磨"}
             </span>
           </div>
         )}
@@ -237,7 +321,7 @@ export function AiPanel() {
               {m.text && (
                 <p
                   className={
-                    "rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2 text-[12.5px] leading-relaxed " +
+                    "whitespace-pre-wrap rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2 text-[12.5px] leading-relaxed " +
                     (m.error ? "text-rose-500" : "text-slate-700")
                   }
                 >
@@ -255,21 +339,19 @@ export function AiPanel() {
                   }
                 >
                   {selection?.level === "bullet" && selection.bulletText && (
-                    <p className="mb-1.5 line-through decoration-slate-300 decoration-1 text-[11.5px] leading-relaxed text-slate-400">
-                      {selection.bulletText.slice(0, 60)}
-                      {selection.bulletText.length > 60 ? "…" : ""}
+                    <p className="mb-1.5 line-through decoration-slate-300 text-[11px] leading-relaxed text-slate-400">
+                      {selection.bulletText.slice(0, 50)}
+                      {selection.bulletText.length > 50 ? "…" : ""}
                     </p>
                   )}
-                  <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-slate-800">
-                    {c.text}
-                  </p>
+                  <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-slate-800">{c.text}</p>
                   {c.reason && (
-                    <p className="mt-1.5 border-t border-slate-100 pt-1.5 text-[11px] leading-relaxed text-slate-400">
+                    <p className="mt-1.5 border-t border-slate-100 pt-1.5 text-[10.5px] leading-relaxed text-slate-400">
                       {c.reason}
                     </p>
                   )}
                   {m.appliedIndex === ci ? (
-                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-600">
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10.5px] font-medium text-emerald-600">
                       ✓ 已应用
                     </span>
                   ) : (
@@ -277,9 +359,9 @@ export function AiPanel() {
                       type="button"
                       disabled={m.appliedIndex != null}
                       onClick={() => applyCandidate(ci, c.text ?? "")}
-                      className="mt-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-[11.5px] font-medium text-white opacity-0 transition-all duration-150 hover:bg-slate-700 group-hover:opacity-100 active:scale-95 disabled:opacity-30"
+                      className="mt-2 rounded-full bg-slate-800 px-3 py-1 text-[11px] font-medium text-white opacity-0 transition-all duration-150 hover:bg-slate-700 group-hover:opacity-100 active:scale-95 disabled:opacity-30"
                     >
-                      应用这个
+                      应用
                     </button>
                   )}
                 </div>
@@ -288,44 +370,47 @@ export function AiPanel() {
           ),
         )}
 
+        {/* 思考中：分阶段随机话术，每秒轮换 */}
         {thinking && (
-          <div className="flex items-center gap-2.5 rounded-2xl bg-slate-100 px-3.5 py-3">
-            <span className="relative flex h-2 w-2">
+          <div className="flex items-center gap-2.5 rounded-2xl bg-slate-100 px-3.5 py-2.5">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-500" />
             </span>
-            <span className="text-[12px] text-slate-500">{THINKING_STEPS[step]}</span>
+            <span key={thinkingLine} className="animate-[thinking-fade_400ms_ease-out] text-[12px] text-slate-500">
+              {thinkingLine}
+            </span>
           </div>
         )}
       </div>
 
       {/* 输入区 */}
-      <div className="shrink-0 border-t border-slate-100 p-3">
-        <div className="flex items-end gap-2 rounded-2xl bg-white/90 p-1.5 shadow-inner ring-1 ring-slate-200/70 focus-within:ring-2 focus-within:ring-sky-300/60">
+      <div className="shrink-0 border-t border-slate-100 p-2.5">
+        <div className="flex items-end gap-2 rounded-2xl bg-white p-1.5 shadow-inner ring-1 ring-slate-200/70 transition-shadow focus-within:ring-2 focus-within:ring-sky-300/60">
           <textarea
             value={input}
-            rows={2}
-            placeholder={selection ? "说说哪里不满意…" : "聊聊你的经历…"}
+            rows={compact ? 1 : 2}
+            placeholder={placeholder}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
                 e.preventDefault();
                 submit();
               }
             }}
-            className="max-h-28 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12.5px] leading-relaxed text-slate-700 outline-none placeholder:text-slate-300"
+            className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12.5px] leading-relaxed text-slate-700 outline-none placeholder:text-slate-300"
           />
           <button
             type="button"
             onClick={submit}
             disabled={thinking || !input.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-md transition-all duration-150 hover:brightness-110 active:scale-90 disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none"
-            title="发送（⌘↵）"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-400 text-white shadow-md transition-all duration-150 hover:brightness-110 active:scale-90 disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none"
+            title="发送（Enter）"
           >
             ↑
           </button>
         </div>
-        <p className="mt-1.5 text-center text-[10px] text-slate-300">⌘ + Enter 发送</p>
+        <p className="mt-1 text-center text-[9.5px] text-slate-300">Enter 发送 · Shift+Enter 换行</p>
       </div>
     </aside>
   );

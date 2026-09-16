@@ -22,9 +22,9 @@ const THINKING_CLASS = "block-thinking";
 
 export function PreviewPanel() {
   const { measureRef, overflowPx, isOverflow, pages } = useOverflow();
-  const aiOpen = useSelectionStore((s) => s.aiOpen);
+  const aiOpen = useSelectionStore((s) => s.panelMode) !== null;
   const select = useSelectionStore((s) => s.select);
-  const clear = useSelectionStore((s) => s.clear);
+  const close = useSelectionStore((s) => s.close);
   const selection = useSelectionStore((s) => s.selection);
   const thinking = useSelectionStore((s) => s.thinking);
   const lastElRef = useRef<HTMLElement | null>(null);
@@ -114,9 +114,9 @@ export function PreviewPanel() {
       });
       return;
     }
-    /* 点在空白处：取消选择（但不关面板——倾诉模式） */
+    /* 点在空白处：关闭面板 + 清选区 */
     if (target === paper || target.classList.contains("paper-content")) {
-      clear();
+      close();
     }
   };
 

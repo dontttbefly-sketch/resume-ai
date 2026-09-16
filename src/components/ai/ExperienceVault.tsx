@@ -7,7 +7,7 @@
  *   - 切换有状态特效说明（顶部横幅渐变提示）
  * ========================================================================== */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
 import { useSelectionStore } from "../../store/useSelectionStore";
 
@@ -71,6 +71,17 @@ export function ExperienceVault() {
   const addItem = useExperienceStore((s) => s.addItem);
   const [editing, setEditing] = useState(false);
 
+  /* 按公司分组（经历库太长 → 分组折叠，一眼看清有什么） */
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof items>();
+    for (const it of items) {
+      if (!map.has(it.company)) map.set(it.company, []);
+      map.get(it.company)!.push(it);
+    }
+    return [...map.entries()];
+  }, [items]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
   if (!vaultOpen) return null;
 
   return (
@@ -125,10 +136,46 @@ export function ExperienceVault() {
         </div>
 
         {/* 内容 */}
-        <div className="thin-scroll min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 py-4">
-          {items.map((it) => (
-            <VaultItem key={it.id} item={it} editing={editing} />
-          ))}
+        <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {groups.map(([company, groupItems]) => {
+            const isCollapsed = collapsed.has(company);
+            return (
+              <div key={company} className="mb-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsed((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(company)) next.delete(company);
+                      else next.add(company);
+                      return next;
+                    })
+                  }
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-slate-100"
+                >
+                  <span
+                    className={
+                      "text-[10px] text-slate-400 transition-transform duration-200 " +
+                      (isCollapsed ? "" : "rotate-90")
+                    }
+                  >
+                    ▸
+                  </span>
+                  <span className="text-[13px] font-semibold text-slate-700">{company}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] text-slate-400">
+                    {groupItems.length} 条
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <div className="ml-3 mt-1 space-y-2 border-l-2 border-slate-100 pl-3">
+                    {groupItems.map((it) => (
+                      <VaultItem key={it.id} item={it} editing={editing} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {items.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-300">
               <p className="text-[13px]">经历库还是空的</p>
