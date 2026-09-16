@@ -57,9 +57,12 @@ export function ResumeDocument() {
         }
 
         return (
-          <section key={desc.key} className={isHeader ? "" : "mt-[2px]"}>
+          <section key={desc.key} className={isHeader ? "" : "mt-[2px]"} data-section-key={desc.key}>
             {!isHeader && (
-              <h2 className="mb-0.5 text-heading font-semibold text-ink">
+              <h2
+                data-select-section={desc.key}
+                className="selectable-block mb-0.5 inline-block cursor-pointer rounded-[6px] text-heading font-semibold text-ink transition-[background-color,box-shadow] duration-100"
+              >
                 <span className="border-b-2 border-brand pb-px">{desc.label}</span>
               </h2>
             )}

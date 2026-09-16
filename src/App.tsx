@@ -1,28 +1,31 @@
-import { EditorPanel } from "./components/EditorPanel";
+/* ============================================================================
+ * AI native 简历工作台
+ *
+ * 布局（见讨论定稿）：
+ *   ┌─────────────┬──────────────────────┐
+ *   │ 左：模块目录   │  中：简历预览（可点选）  │      右：AI 面板（浮动滑出）
+ *   │ 灰字平铺可编辑 │  点小段 / 大块 / 整块    │  +  经历库浮窗（半屏）
+ *   └─────────────┴──────────────────────┘
+ *
+ * 交互核心：点简历的任意段落 → AI 面板滑出携带上下文 → 说不满 → 候选 → 应用
+ * ========================================================================== */
+
 import { Toolbar } from "./components/Toolbar";
-import { JdPanel } from "./components/jd/JdPanel";
-import { PoolPanel } from "./components/pool/PoolPanel";
-import { ExperiencePanel } from "./components/experience/ExperiencePanel";
 import { PreviewPanel } from "./components/preview/PreviewPanel";
-import { useUiStore } from "./store/useUiStore";
+import { OutlinePanel } from "./components/outline/OutlinePanel";
+import { AiPanel } from "./components/ai/AiPanel";
+import { ExperienceVault } from "./components/ai/ExperienceVault";
 
 export default function App() {
-  const view = useUiStore((s) => s.view);
-
   return (
-    <div className="app-shell flex h-screen flex-col overflow-hidden bg-slate-100">
+    <div className="app-shell flex h-screen flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-white to-sky-50/70">
       <Toolbar />
       <div className="app-main flex min-h-0 flex-1">
-        {view === "resume" && (
-          <>
-            <EditorPanel />
-            <PreviewPanel />
-          </>
-        )}
-        {view === "jd" && <JdPanel />}
-        {view === "pool" && <PoolPanel />}
-        {view === "experience" && <ExperiencePanel />}
+        <OutlinePanel />
+        <PreviewPanel />
       </div>
+      <AiPanel />
+      <ExperienceVault />
     </div>
   );
 }

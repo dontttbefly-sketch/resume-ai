@@ -188,3 +188,68 @@ body {
     page-break-after: avoid;
   }
 }
+
+/* ============================================================================
+ * AI native 交互层（点选 / 悬停 / 思考模糊 / 应用高亮 / 面板动效）
+ * 设计语言：苹果式 —— 圆润、克制、精致
+ * ========================================================================== */
+
+/* ---------- 简历内可点段落的悬停暗示 ---------- */
+.resume-paper [data-bullet-index],
+.resume-paper [data-select-entry],
+.resume-paper [data-select-section] {
+  position: relative;
+  border-radius: 6px;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.resume-paper [data-bullet-index]:hover,
+.resume-paper [data-select-entry]:hover,
+.resume-paper [data-select-section]:hover {
+  background-color: rgba(14, 165, 233, 0.05);
+  box-shadow: -2px 0 0 0 rgb(14 165 233 / 0.55);
+}
+
+/* 灰字区域（职位/城市等 meta）：不可点，点击穿透 */
+.resume-paper .sub-meta {
+  pointer-events: none;
+}
+
+/* ---------- 选中态 ---------- */
+.block-selected {
+  background-color: rgba(14, 165, 233, 0.08) !important;
+  box-shadow: -2.5px 0 0 0 rgb(14 165 233) !important;
+}
+
+/* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
+.block-thinking {
+  filter: blur(2.5px);
+  opacity: 0.65;
+  transform: translateY(1px);
+  transition: filter 400ms ease, opacity 400ms ease, transform 400ms ease;
+}
+
+/* ---------- 应用成功：黄色高亮渐隐 ---------- */
+@keyframes applied-flash {
+  0% { background-color: rgba(250, 204, 21, 0.35); }
+  100% { background-color: transparent; }
+}
+.block-applied {
+  animation: applied-flash 1.4s ease-out;
+  border-radius: 6px;
+}
+
+/* ---------- 面板滑入动效 ---------- */
+@keyframes ai-slide-in {
+  from { transform: translateX(32px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes vault-slide-in {
+  from { transform: translateX(48px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes vault-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
