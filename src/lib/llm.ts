@@ -74,7 +74,15 @@ export function hasLlmKey(): boolean {
 }
 
 interface RawResponse {
-  choices?: { message?: { content?: string }; text?: string; finish_reason?: string }[];
+  choices?: {
+    message?: {
+      content?: string;
+      /** MiniMax reasoning_split: true 时，思考过程放这里 */
+      reasoning_details?: string | { text?: string }[];
+    };
+    text?: string;
+    finish_reason?: string;
+  }[];
   reply?: string;
   output_text?: string;
   base_resp?: { status_code?: number; status_msg?: string };
@@ -108,6 +116,18 @@ function extractContent(data: unknown): string {
   return "";
 }
 
+/** 提取思考过程（reasoning_details） */
+function extractReasoning(data: unknown): string {
+  if (typeof data !== "object" || data === null) return "";
+  const d = data as RawResponse;
+  const rd = d.choices?.[0]?.message?.reasoning_details;
+  if (typeof rd === "string") return rd.trim();
+  if (Array.isArray(rd)) {
+    return rd.map((x) => (typeof x === "string" ? x : x?.text ?? "")).join("").trim();
+  }
+  return "";
+}
+
 /** 把供应商的报错信息尽量读出来，便于定位问题 */
 function readApiError(data: unknown): string {
   if (typeof data !== "object" || data === null) return "";
@@ -122,7 +142,7 @@ export interface ChatOptions {
   maxTokens?: number;
 }
 
-export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
+async function doChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<{ content: string; reasoning: string }> {
   if (!hasLlmKey()) {
     throw new LlmError(
       "no-key",
@@ -194,6 +214,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
 
   const data: unknown = await res.json().catch(() => null);
   const content = extractContent(data);
+  const reasoning = extractReasoning(data);
   if (!content) {
     const finishReason = (data as RawResponse | null)?.choices?.[0]?.finish_reason;
     const truncated = finishReason === "length";
@@ -206,5 +227,18 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
         : JSON.stringify(data).slice(0, 400),
     );
   }
-  return content;
+  return { content, reasoning };
+}
+
+/** 兼容旧调用：只返回正文 */
+export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
+  return (await doChat(messages, opts)).content;
+}
+
+/** 完整返回：正文 + 思考过程（reasoning_split 分离出来的深度思考） */
+export async function chatFull(
+  messages: ChatMessage[],
+  opts: ChatOptions = {},
+): Promise<{ content: string; reasoning: string }> {
+  return doChat(messages, opts);
 }

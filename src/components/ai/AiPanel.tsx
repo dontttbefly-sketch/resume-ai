@@ -12,7 +12,7 @@
  * ========================================================================== */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { chat, LlmError } from "../../lib/llm";
+import { chatFull, LlmError } from "../../lib/llm";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { useResumeStore } from "../../store/useResumeStore";
 import { useExperienceStore } from "../../store/useExperienceStore";
@@ -37,6 +37,8 @@ interface Msg {
   /** 自由聊里挖掘到的经历（可一键存入经历库） */
   exp?: ExtractedExp;
   expSaved?: boolean;
+  /** 模型的深度思考过程（可展开查看） */
+  reasoning?: string;
 }
 
 /* ---------- 思考话术：分阶段 + 随机轮换（每秒一条，不重复） ---------- */
@@ -128,19 +130,17 @@ const SUGGESTIONS = [
   "有段经历没写进简历，想补上",
 ];
 
-const SYSTEM_IMPROVE = `你是一位顶级简历优化专家，帮用户改进简历的一个片段。
+const SYSTEM_IMPROVE = `你是一位顶级简历顾问，帮用户改进简历。
 
 ${RULES}
 
-【输出要求】
-只返回 JSON，不要任何其他文字：
-{
-  "candidates": [
-    { "text": "改进后的完整内容", "reason": "一句话说明为什么这么改" },
-    { "text": "...", "reason": "..." }
-  ]
-}
-给 2-3 个风格不同的候选。`;
+【重要：先判断用户意图，再决定输出格式】
+1. 探讨/咨询类（如"有哪些改进方向""这样写怎么样""你觉得哪里弱"）：
+   → 用自然语言给出分析和建议（分点、具体、可操作），**不要**返回 JSON。
+2. 明确修改类（如"改啰嗦点""重写""换个说法""压缩一下"）：
+   → 只返回 JSON，不要其他文字：
+   { "candidates": [ { "text": "改进后的完整内容", "reason": "一句话说明为什么这么改" } ] }
+   给 2-3 个风格不同的候选。`;
 
 const SYSTEM_CHAT = `你是用户的简历顾问，帮他把简历做好、挖掘他的经历。
 
@@ -153,6 +153,35 @@ ${RULES}
 【经历沉淀】如果用户这段话透露了一段值得写进简历的具体经历（有公司/项目/成果），
 请在回复的最后**另起一行**附上这一行标记（没有新经历就不要加）：
 <<EXP:公司名|项目名|一句话摘要>>`;
+
+/** 可折叠的思考过程（深度思考的证明） */
+function ReasoningBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-3.5 py-1.5 text-left text-[10.5px] text-slate-400 transition-colors hover:text-slate-600"
+      >
+        <span className={"transition-transform duration-200 " + (open ? "rotate-90" : "")}>▸</span>
+        深度思考（{text.length} 字）
+      </button>
+      <div
+        className={
+          "grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] " +
+          (open ? "[grid-template-rows:1fr]" : "[grid-template-rows:0fr]")
+        }
+      >
+        <div className="overflow-hidden">
+          <p className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-slate-200/60 px-3.5 py-2 text-[11px] leading-relaxed text-slate-400">
+            {text}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AiPanel() {
   const panelOpen = useSelectionStore((s) => s.panelOpen);
@@ -233,7 +262,7 @@ export function AiPanel() {
         userContent = feedback;
       }
 
-      const reply = await chat(
+      const { content: reply, reasoning } = await chatFull(
         [
           { role: "system", content: isImprove ? SYSTEM_IMPROVE : SYSTEM_CHAT },
           { role: "user", content: userContent },
@@ -255,8 +284,8 @@ export function AiPanel() {
         setMessages((prev) => [
           ...prev,
           candidates.length > 0
-            ? { role: "assistant", text: "", candidates }
-            : { role: "assistant", text: reply.trim() || "（空回复）" },
+            ? { role: "assistant", text: "", candidates, reasoning }
+            : { role: "assistant", text: reply.trim() || "（空回复）", reasoning },
         ]);
       } else {
         /* 自由聊：解析可能附带的新经历标记 <<EXP:公司|项目|摘要>> */
@@ -270,7 +299,7 @@ export function AiPanel() {
           }
           clean = reply.replace(/<<EXP:.*?>>/g, "").trim();
         }
-        setMessages((prev) => [...prev, { role: "assistant", text: clean, exp }]);
+        setMessages((prev) => [...prev, { role: "assistant", text: clean, exp, reasoning }]);
       }
     } catch (err) {
       const msg = err instanceof LlmError ? err.message : err instanceof Error ? err.message : "调用失败";
@@ -383,6 +412,7 @@ export function AiPanel() {
             </div>
           ) : (
             <div key={i} className="space-y-2">
+              {m.reasoning && <ReasoningBlock text={m.reasoning} />}
               {m.text && (
                 <p
                   className={
