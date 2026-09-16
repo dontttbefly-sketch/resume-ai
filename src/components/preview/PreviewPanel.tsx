@@ -1,20 +1,18 @@
 /* ============================================================================
- * 中间：简历预览（可点选）
+ * 中间：简历预览（可多选）
  *
- * 交互模型（见讨论定稿）：
- *   - 悬停可点段落：左侧浮现 2px 色条 + 极轻底色（不遮字）
- *   - 点击小段（bullet）→ 选中该段，AI 面板滑出
- *   - 点击公司标题（h3）→ 选中整个条目
- *   - 点击模块标题（h2）→ 选中整块
- *   - AI 思考中：选区高斯模糊 + 轻微下沉
- *   - 应用成功：改动处黄色高亮渐隐
+ * 交互（第三轮定稿）：
+ *   - 点击段落/公司名/模块标题 → toggle 选区（再点同一个取消）
+ *   - 选中 entry 级 → 高亮整个条目卡片（不只标题）
+ *   - 点空白 → 清空全部选区 + 关面板
+ *   - thinking → 所有选区模糊
  * ========================================================================== */
 
 import { useEffect, useRef } from "react";
 import { useOverflow } from "../../hooks/useOverflow";
 import { IconWarn } from "../icons";
 import { ResumeDocument } from "./ResumeDocument";
-import { useSelectionStore, type Selection } from "../../store/useSelectionStore";
+import { useSelectionStore, selectionKey } from "../../store/useSelectionStore";
 import { SECTION_MAP } from "../../data/sections";
 
 const SELECTED_CLASS = "block-selected";
@@ -22,43 +20,41 @@ const THINKING_CLASS = "block-thinking";
 
 export function PreviewPanel() {
   const { measureRef, overflowPx, isOverflow, pages } = useOverflow();
-  const aiOpen = useSelectionStore((s) => s.panelMode) !== null;
-  const select = useSelectionStore((s) => s.select);
+  const toggle = useSelectionStore((s) => s.toggle);
   const close = useSelectionStore((s) => s.close);
-  const selection = useSelectionStore((s) => s.selection);
+  const selections = useSelectionStore((s) => s.selections);
   const thinking = useSelectionStore((s) => s.thinking);
-  const lastElRef = useRef<HTMLElement | null>(null);
+  const panelOpen = useSelectionStore((s) => s.panelOpen);
+  const elsRef = useRef<HTMLElement[]>([]);
 
-  /** 根据当前 selection / thinking 同步 DOM 类 */
+  /** 选区 → DOM 高亮同步（支持多个） */
   useEffect(() => {
-    const prev = lastElRef.current;
-    if (prev) {
-      prev.classList.remove(SELECTED_CLASS, THINKING_CLASS);
-      lastElRef.current = null;
-    }
-    if (!selection) return;
-    const el = document.querySelector<HTMLElement>(
-      `[data-section-key="${selection.sectionKey}"]`,
-    );
-    if (!el) return;
-    let target: HTMLElement | null = null;
-    if (selection.level === "section") {
-      target = el.querySelector<HTMLElement>("[data-select-section]");
-    } else if (selection.level === "entry" && selection.entryId) {
-      target = el.querySelector<HTMLElement>(`[data-entry-id="${selection.entryId}"] [data-select-entry]`);
-    } else if (selection.level === "bullet" && selection.entryId != null) {
-      target = el.querySelector<HTMLElement>(
-        `[data-entry-id="${selection.entryId}"] [data-bullet-index="${selection.bulletIndex}"]`,
-      );
-    }
-    if (target) {
-      target.classList.add(SELECTED_CLASS);
-      if (thinking) target.classList.add(THINKING_CLASS);
-      lastElRef.current = target;
-    }
-  }, [selection, thinking]);
+    elsRef.current.forEach((el) => el.classList.remove(SELECTED_CLASS, THINKING_CLASS));
+    elsRef.current = [];
 
-  /** 点击委托：从事件目标向上找最近的可点标记 */
+    for (const sel of selections) {
+      const sectionEl = document.querySelector<HTMLElement>(`[data-section-key="${sel.sectionKey}"]`);
+      if (!sectionEl) continue;
+      let target: HTMLElement | null = null;
+      if (sel.level === "section") {
+        target = sectionEl.querySelector<HTMLElement>("[data-select-section]");
+      } else if (sel.level === "entry" && sel.entryId) {
+        /* entry 级：高亮整个条目卡片（标题 + 灰字 + 全部要点） */
+        target = sectionEl.querySelector<HTMLElement>(`[data-entry-id="${sel.entryId}"]`);
+      } else if (sel.level === "bullet" && sel.entryId != null) {
+        target = sectionEl.querySelector<HTMLElement>(
+          `[data-entry-id="${sel.entryId}"] [data-bullet-index="${sel.bulletIndex}"]`,
+        );
+      }
+      if (target) {
+        target.classList.add(SELECTED_CLASS);
+        if (thinking) target.classList.add(THINKING_CLASS);
+        elsRef.current.push(target);
+      }
+    }
+  }, [selections, thinking]);
+
+  /** 点击委托：toggle 选区 */
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const paper = target.closest(".resume-paper");
@@ -75,16 +71,20 @@ export function PreviewPanel() {
         e.preventDefault();
         e.stopPropagation();
         const idx = Number(bulletLi.dataset.bulletIndex);
-        const sel: Selection = {
+        const entryLabel =
+          article.querySelector("[data-select-entry]")?.getAttribute("data-entry-label") ?? "";
+        const sk = sectionEl.dataset.sectionKey!;
+        const eid = article.dataset.entryId!;
+        toggle({
           level: "bullet",
-          sectionKey: sectionEl.dataset.sectionKey!,
-          sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sectionEl.dataset.sectionKey || ""]?.label ?? "",
-          entryId: article.dataset.entryId!,
-          entryLabel: article.querySelector("[data-select-entry]")?.getAttribute("data-entry-label") ?? "",
+          sectionKey: sk,
+          sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
+          entryId: eid,
+          entryLabel,
           bulletIndex: idx,
           bulletText: bulletLi.textContent?.replace(/^•/, "").trim() ?? "",
-        };
-        select(sel);
+          key: selectionKey({ level: "bullet", sectionKey: sk, entryId: eid, bulletIndex: idx, sectionLabel: "" }),
+        });
         return;
       }
     }
@@ -94,12 +94,15 @@ export function PreviewPanel() {
       if (article && sectionEl) {
         e.preventDefault();
         e.stopPropagation();
-        select({
+        const sk = sectionEl.dataset.sectionKey!;
+        const eid = article.dataset.entryId!;
+        toggle({
           level: "entry",
-          sectionKey: sectionEl.dataset.sectionKey!,
-          sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sectionEl.dataset.sectionKey || ""]?.label ?? "",
-          entryId: article.dataset.entryId!,
+          sectionKey: sk,
+          sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
+          entryId: eid,
           entryLabel: entryH3.getAttribute("data-entry-label") ?? "",
+          key: selectionKey({ level: "entry", sectionKey: sk, entryId: eid, sectionLabel: "" }),
         });
         return;
       }
@@ -107,14 +110,16 @@ export function PreviewPanel() {
     if (sectionH2) {
       e.preventDefault();
       e.stopPropagation();
-      select({
+      const sk = sectionH2.dataset.selectSection!;
+      toggle({
         level: "section",
-        sectionKey: sectionH2.dataset.selectSection!,
-        sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sectionH2.dataset.selectSection || ""]?.label ?? "",
+        sectionKey: sk,
+        sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
+        key: selectionKey({ level: "section", sectionKey: sk, sectionLabel: "" }),
       });
       return;
     }
-    /* 点在空白处：关闭面板 + 清选区 */
+    /* 点在空白处：清空选区 + 关闭面板 */
     if (target === paper || target.classList.contains("paper-content")) {
       close();
     }
@@ -137,13 +142,11 @@ export function PreviewPanel() {
       <div
         className={
           "app-preview-scroll thin-scroll min-h-0 flex-1 overflow-auto px-6 py-6 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] " +
-          (aiOpen ? "lg:pr-[420px]" : "")
+          (panelOpen ? "lg:pr-[420px]" : "")
         }
       >
         <div className="resume-paper relative mx-auto">
-          {/* 单页内容安全区底边 */}
           <div className="no-print pointer-events-none absolute inset-x-[14mm] top-[283mm] border-t border-dashed border-rose-300/70" />
-
           <div ref={measureRef} className="paper-content">
             <ResumeDocument />
           </div>

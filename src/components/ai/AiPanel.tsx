@@ -16,7 +16,6 @@ import { chat, LlmError } from "../../lib/llm";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { useResumeStore } from "../../store/useResumeStore";
 import { useExperienceStore } from "../../store/useExperienceStore";
-import { SECTION_MAP } from "../../data/sections";
 
 interface Candidate {
   text?: string;
@@ -156,11 +155,11 @@ ${RULES}
 <<EXP:公司名|项目名|一句话摘要>>`;
 
 export function AiPanel() {
-  const panelMode = useSelectionStore((s) => s.panelMode);
-  const selection = useSelectionStore((s) => s.selection);
+  const panelOpen = useSelectionStore((s) => s.panelOpen);
+  const selections = useSelectionStore((s) => s.selections);
+  const removeSelection = useSelectionStore((s) => s.remove);
   const thinking = useSelectionStore((s) => s.thinking);
   const setThinking = useSelectionStore((s) => s.setThinking);
-  const detach = useSelectionStore((s) => s.detach);
   const close = useSelectionStore((s) => s.close);
 
   const setBullet = useResumeStore((s) => s.setBullet);
@@ -171,8 +170,6 @@ export function AiPanel() {
   const [input, setInput] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const thinkingLine = useThinkingLine(thinking);
-
-  const compact = panelMode === "compact";
 
   /* Esc 关闭 */
   useEffect(() => {
@@ -188,61 +185,24 @@ export function AiPanel() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
-  /* ---------- 锚点：compact 面板垂直对齐到被选中的段落（像批注贴在旁边） ---------- */
-  const [anchorTop, setAnchorTop] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!compact || !selection) {
-      setAnchorTop(null);
-      return;
-    }
-    const PANEL_H = Math.min(Math.round(window.innerHeight * 0.62), 520);
-    let scrolled = false;
-    const place = (r: DOMRect) =>
-      setAnchorTop(Math.round(Math.max(60, Math.min(r.top - 12, window.innerHeight - PANEL_H - 16))));
-    const calc = () => {
-      const el = document.querySelector(".block-selected");
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      /* 段落不在视口内 → 先居中滚动，让用户看到它，再定位面板 */
-      if (!scrolled && (r.top < 60 || r.bottom > window.innerHeight - 60)) {
-        scrolled = true;
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        window.setTimeout(() => {
-          const r2 = el.getBoundingClientRect();
-          place(r2);
-        }, 450);
-        return;
-      }
-      place(r);
-    };
-    calc();
-    /* 选区渲染晚一拍（PreviewPanel 的 effect 才加类），再算一次 */
-    const t = window.setTimeout(calc, 80);
-    window.addEventListener("scroll", calc, true);
-    window.addEventListener("resize", calc);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("scroll", calc, true);
-      window.removeEventListener("resize", calc);
-    };
-  }, [compact, selection, thinking]);
-
   const placeholder = useMemo(() => {
     if (thinking) return "AI 正在思考…";
-    if (selection && compact) return "说说哪里不满意…";
+    if (selections.length > 0) return "说说对选中部分的想法…";
     return "聊聊简历、经历…";
-  }, [thinking, selection, compact]);
+  }, [thinking, selections]);
 
-  if (!panelMode) return null;
+  if (!panelOpen) return null;
 
-  const contextLabel = selection
-    ? selection.level === "bullet"
-      ? `${selection.entryLabel} · 第 ${(selection.bulletIndex ?? 0) + 1} 条`
-      : selection.level === "entry"
-        ? `${selection.entryLabel}（整段）`
-        : selection.sectionLabel
-    : "自由对话";
+  const contextLabel =
+    selections.length === 0
+      ? "自由对话"
+      : selections.length === 1
+        ? selections[0].level === "bullet"
+          ? `${selections[0].entryLabel} · 第 ${(selections[0].bulletIndex ?? 0) + 1} 条`
+          : selections[0].level === "entry"
+            ? `${selections[0].entryLabel}（整段）`
+            : selections[0].sectionLabel
+        : `已选 ${selections.length} 块`;
 
   async function submit() {
     const feedback = input.trim();
@@ -251,21 +211,24 @@ export function AiPanel() {
     setMessages((m) => [...m, { role: "user", text: feedback }]);
     setThinking(true);
 
-    const isImprove = !!selection && compact;
+    const isImprove = selections.length > 0;
     try {
       let userContent: string;
-      if (isImprove && selection) {
-        const secLabel =
-          (SECTION_MAP as Record<string, { label: string }>)[selection.sectionKey]?.label ?? selection.sectionKey;
-        if (selection.level === "bullet") {
-          userContent = `【模块】${secLabel}\n【条目】${selection.entryLabel}\n【当前这条内容】${selection.bulletText}\n\n【用户反馈】${feedback}`;
-        } else if (selection.level === "entry") {
-          const entry = sections[selection.sectionKey]?.find((e) => e.id === selection.entryId);
-          const bullets = (entry?.values.bullets as string[] | undefined) ?? [];
-          userContent = `【模块】${secLabel}\n【条目】${selection.entryLabel}\n【当前全部要点】\n${bullets.map((b, i) => `${i + 1}. ${b}`).join("\n")}\n\n【用户反馈】${feedback}`;
-        } else {
-          userContent = `【模块】${secLabel}（用户想改进整个模块）\n【用户反馈】${feedback}\n\n请给整块改进的候选。`;
+      if (isImprove) {
+        /* 多选：拼接所有选中的内容 */
+        const parts: string[] = [];
+        for (const sel of selections) {
+          if (sel.level === "bullet") {
+            parts.push(`【${sel.entryLabel} · 第 ${(sel.bulletIndex ?? 0) + 1} 条】${sel.bulletText}`);
+          } else if (sel.level === "entry") {
+            const entry = sections[sel.sectionKey]?.find((e) => e.id === sel.entryId);
+            const bullets = (entry?.values.bullets as string[] | undefined) ?? [];
+            parts.push(`【${sel.entryLabel}（整段）】\n${bullets.map((b, i) => `${i + 1}. ${b}`).join("\n")}`);
+          } else {
+            parts.push(`【模块：${sel.sectionLabel}（整块）】`);
+          }
         }
+        userContent = `用户选中了以下简历内容：\n\n${parts.join("\n\n")}\n\n【用户反馈】${feedback}`;
       } else {
         userContent = feedback;
       }
@@ -318,14 +281,9 @@ export function AiPanel() {
   }
 
   function applyCandidate(idx: number, text: string) {
-    if (!selection) return;
-    if (selection.level === "bullet") {
-      setBullet(selection.sectionKey as never, selection.entryId!, "bullets", selection.bulletIndex!, text);
-    } else if (selection.level === "entry") {
-      const lines = text.split("\n").map((l) => l.replace(/^\d+[.、]\s*/, "").trim()).filter(Boolean);
-      lines.forEach((line, i) => {
-        setBullet(selection.sectionKey as never, selection.entryId!, "bullets", i, line);
-      });
+    const bulletSel = selections.find((x) => x.level === "bullet");
+    if (bulletSel) {
+      setBullet(bulletSel.sectionKey as never, bulletSel.entryId!, "bullets", bulletSel.bulletIndex!, text);
     }
     setMessages((prev) =>
       prev.map((mm, i) => (i === prev.length - 1 ? { ...mm, appliedIndex: idx } : mm)),
@@ -335,39 +293,18 @@ export function AiPanel() {
   return (
     <aside
       className={
-        "ai-panel no-print fixed right-4 z-40 flex w-[380px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/[0.93] shadow-[0_2px_8px_rgba(15,23,42,0.06),0_12px_40px_rgba(15,23,42,0.14)] backdrop-blur-2xl transition-[top] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] animate-[ai-slide-in_280ms_cubic-bezier(0.32,0.72,0,1)] " +
-        (compact ? "" : "top-14 bottom-4")
-      }
-      style={
-        compact
-          ? {
-              top: anchorTop ?? 80,
-              height: "min(62vh, 520px)",
-            }
-          : undefined
+        "ai-panel no-print fixed top-14 bottom-4 right-4 z-40 flex w-[380px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/[0.93] shadow-[0_2px_8px_rgba(15,23,42,0.06),0_12px_40px_rgba(15,23,42,0.14)] backdrop-blur-2xl animate-[ai-slide-in_280ms_cubic-bezier(0.32,0.72,0,1)]"
       }
     >
-      {/* 头部：上下文 */}
+      {/* 头部 */}
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-4 py-2.5">
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-sky-500 text-[11px] text-white shadow-sm">
           ✦
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12.5px] font-semibold text-slate-700">
-            {selection && compact ? "改进这段" : "AI 简历顾问"}
-          </p>
+          <p className="truncate text-[12.5px] font-semibold text-slate-700">AI 简历顾问</p>
           <p className="truncate text-[10.5px] text-slate-400">{contextLabel}</p>
         </div>
-        {selection && compact && (
-          <button
-            type="button"
-            onClick={detach}
-            className="rounded-full px-2 py-0.5 text-[10.5px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-            title="不聊这段了，转自由对话"
-          >
-            转自由聊
-          </button>
-        )}
         <button
           type="button"
           onClick={close}
@@ -378,44 +315,64 @@ export function AiPanel() {
         </button>
       </div>
 
+      {/* 选区标签行（多选 chips，像飞书引用） */}
+      {selections.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-4 py-2">
+          {selections.map((sel) => (
+            <span
+              key={sel.key}
+              className="group inline-flex max-w-full items-center gap-1 rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-600 ring-1 ring-violet-200/70"
+            >
+              <span className="truncate">
+                {sel.level === "bullet"
+                  ? `#${sel.entryLabel}·第${(sel.bulletIndex ?? 0) + 1}条`
+                  : sel.level === "entry"
+                    ? `#${sel.entryLabel} 整段`
+                    : `#${sel.sectionLabel} 整块`}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeSelection(sel.key)}
+                className="ml-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-violet-400 transition-colors hover:bg-violet-200 hover:text-violet-700"
+                title="移除此选区"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* 消息流 */}
       <div ref={listRef} className="thin-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length === 0 && !thinking && (
-          selection && compact ? (
-            <div className="flex h-full flex-col items-center justify-center gap-1.5 text-center">
-              <span className="text-[12px] leading-relaxed text-slate-400">
-                说说哪里不满意，比如「太啰嗦」「换个角度」「更有冲击力」
-              </span>
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-1 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-sky-400 text-[18px] text-white shadow-[0_4px_16px_rgba(99,102,241,0.35)]">
+              ✦
+            </span>
+            <div>
+              <p className="text-[13.5px] font-semibold text-slate-700">跟我聊聊，让我更懂你</p>
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-slate-400">
+                点击简历任意段落挂载选区，或直接聊
+                <br />
+                你说的经历会沉淀进
+                <span className="font-medium text-violet-500">经历库</span>
+                ，写简历时自动引用
+              </p>
             </div>
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 px-1 text-center">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-sky-400 text-[18px] text-white shadow-[0_4px_16px_rgba(99,102,241,0.35)]">
-                ✦
-              </span>
-              <div>
-                <p className="text-[13.5px] font-semibold text-slate-700">跟我聊聊，让我更懂你</p>
-                <p className="mt-1.5 text-[11.5px] leading-relaxed text-slate-400">
-                  你说的每段经历我都会沉淀进
-                  <span className="font-medium text-violet-500">经历库</span>
-                  ，写简历时自动引用
-                  <br />
-                  —— 聊得越多，我越能写出像你的简历
-                </p>
-              </div>
-              <div className="mt-0.5 flex w-full max-w-[290px] flex-col gap-1.5">
-                {SUGGESTIONS.map((sg) => (
-                  <button
-                    key={sg}
-                    type="button"
-                    onClick={() => setInput(sg)}
-                    className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-left text-[11.5px] text-slate-500 transition-all duration-150 hover:border-violet-300 hover:bg-violet-50/70 hover:text-violet-600 active:scale-[0.98]"
-                  >
-                    {sg}
-                  </button>
-                ))}
-              </div>
+            <div className="mt-0.5 flex w-full max-w-[290px] flex-col gap-1.5">
+              {SUGGESTIONS.map((sg) => (
+                <button
+                  key={sg}
+                  type="button"
+                  onClick={() => setInput(sg)}
+                  className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-left text-[11.5px] text-slate-500 transition-all duration-150 hover:border-violet-300 hover:bg-violet-50/70 hover:text-violet-600 active:scale-[0.98]"
+                >
+                  {sg}
+                </button>
+              ))}
             </div>
-          )
+          </div>
         )}
         {messages.map((m, i) =>
           m.role === "user" ? (
@@ -437,7 +394,7 @@ export function AiPanel() {
                 </p>
               )}
               {/* 挖掘到的经历 → 确认后存入经历库 */}
-              {m.exp && (
+              {m.exp && (<>
                 <div className="rounded-2xl border border-violet-200 bg-violet-50/70 px-3.5 py-2.5">
                   <p className="text-[10.5px] font-medium text-violet-500">✦ 检测到一段新经历</p>
                   <p className="mt-1 text-[12.5px] font-semibold text-slate-800">
@@ -456,7 +413,7 @@ export function AiPanel() {
                       type="button"
                       onClick={() => {
                         addExperience({ company: m.exp!.company, project: m.exp!.project, summary: m.exp!.summary });
-                        setMessages((prev) => prev.map((mm, i) => (i === messages.indexOf(m) ? { ...mm, expSaved: true } : mm)));
+                        setMessages((prev) => prev.map((mm, mi) => (mi === i ? { ...mm, expSaved: true } : mm)));
                       }}
                       className="mt-2 rounded-full bg-gradient-to-r from-violet-500 to-sky-400 px-3 py-1 text-[11px] font-medium text-white shadow-sm transition-all hover:brightness-110 active:scale-95"
                     >
@@ -464,7 +421,7 @@ export function AiPanel() {
                     </button>
                   )}
                 </div>
-              )}
+              </>)}
               {m.candidates?.map((c, ci) => (
                 <div
                   key={ci}
@@ -475,10 +432,9 @@ export function AiPanel() {
                       : "border-slate-200 bg-white/90 hover:border-sky-300 hover:shadow-[0_2px_12px_rgba(14,165,233,0.1)]")
                   }
                 >
-                  {selection?.level === "bullet" && selection.bulletText && (
+                  {selections.find((x) => x.level === "bullet")?.bulletText && (
                     <p className="mb-1.5 line-through decoration-slate-300 text-[11px] leading-relaxed text-slate-400">
-                      {selection.bulletText.slice(0, 50)}
-                      {selection.bulletText.length > 50 ? "…" : ""}
+                      {(selections.find((x) => x.level === "bullet")?.bulletText ?? "").slice(0, 50)}…
                     </p>
                   )}
                   <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-slate-800">{c.text}</p>
@@ -507,18 +463,29 @@ export function AiPanel() {
           ),
         )}
 
-        {/* 思考中：分阶段随机话术，每秒轮换 */}
+        {/* 思考中：大气居中版（渐变球呼吸 + 大字话术 + 三点波浪） */}
         {thinking && (
-          <div className="flex items-center gap-2.5 rounded-2xl bg-slate-100 px-3.5 py-2.5">
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-500" />
+          <div className="flex flex-col items-center justify-center gap-4 rounded-2xl bg-gradient-to-b from-slate-50 to-white px-6 py-8">
+            {/* 渐变球：柔和呼吸脉动 */}
+            <span className="relative flex h-14 w-14 items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-400 via-indigo-400 to-sky-400 opacity-30 blur-md animate-[think-breathe_2.4s_ease-in-out_infinite]" />
+              <span className="absolute inset-1.5 rounded-full bg-gradient-to-br from-violet-500 via-indigo-500 to-sky-400 shadow-[0_4px_20px_rgba(99,102,241,0.4)] animate-[think-breathe_2.4s_ease-in-out_infinite]" style={{ animationDelay: "0.3s" }} />
+              <span className="absolute inset-[22px] rounded-full bg-white/90 animate-[think-pulse_1.2s_ease-in-out_infinite]" />
             </span>
-            <span key={thinkingLine} className="animate-[thinking-fade_400ms_ease-out] text-[12px] text-slate-500">
+            {/* 话术：大字居中，每秒轮换 */}
+            <p key={thinkingLine} className="animate-[thinking-fade_400ms_ease-out] text-center text-[13.5px] font-medium text-slate-600">
               {thinkingLine}
-            </span>
+            </p>
+            {/* 三点波浪 */}
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-[think-dot_1.4s_ease-in-out_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-[think-dot_1.4s_ease-in-out_infinite]" style={{ animationDelay: "0.2s" }} />
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-[think-dot_1.4s_ease-in-out_infinite]" style={{ animationDelay: "0.4s" }} />
+            </div>
           </div>
         )}
+
+
       </div>
 
       {/* 输入区 */}
@@ -526,7 +493,7 @@ export function AiPanel() {
         <div className="flex items-end gap-2 rounded-2xl bg-white p-1.5 shadow-inner ring-1 ring-slate-200/70 transition-shadow focus-within:ring-2 focus-within:ring-sky-300/60">
           <textarea
             value={input}
-            rows={compact ? 2 : 3}
+            rows={2}
             placeholder={placeholder}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {

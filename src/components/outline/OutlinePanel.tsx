@@ -84,7 +84,7 @@ function EntryCard({
   const entry = useResumeStore((s) => s.sections[sectionKey]?.find((e) => e.id === entryId));
   const setField = useResumeStore((s) => s.setField);
   const setBullet = useResumeStore((s) => s.setBullet);
-  const select = useSelectionStore((s) => s.select);
+  const toggle = useSelectionStore((s) => s.toggle);
   const [expanded, setExpanded] = useState(false);
 
   if (!entry) return null;
@@ -186,7 +186,7 @@ function EntryCard({
       <button
         type="button"
         onClick={() =>
-          select({ level: "entry", sectionKey, sectionLabel, entryId, entryLabel: title })
+          toggle({ level: "entry", sectionKey, sectionLabel, entryId, entryLabel: title, key: `${sectionKey}:${entryId}` })
         }
         className="mt-2 hidden w-full items-center justify-center gap-1 rounded-xl border border-sky-200 bg-sky-50/60 py-1.5 text-[11.5px] font-medium text-sky-600 transition-all duration-150 hover:bg-sky-100 group-hover:flex"
       >
@@ -199,7 +199,7 @@ function EntryCard({
 export function OutlinePanel() {
   const sections = useResumeStore((s) => s.sections);
   const visibility = useResumeStore((s) => s.visibility);
-  const select = useSelectionStore((s) => s.select);
+  const toggle = useSelectionStore((s) => s.toggle);
 
   const visibleSections = SECTIONS.filter(
     (d) => d.key !== "basics" && (visibility[d.key] ?? d.defaultVisible) && (sections[d.key]?.length ?? 0) > 0,
@@ -220,7 +220,7 @@ export function OutlinePanel() {
               <button
                 type="button"
                 onClick={() =>
-                  select({ level: "section", sectionKey: desc.key, sectionLabel: desc.label })
+                  toggle({ level: "section", sectionKey: desc.key, sectionLabel: desc.label, key: `sec:${desc.key}` })
                 }
                 className="mb-2 flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left transition-colors hover:bg-slate-200/60"
                 title="选中整个模块"
