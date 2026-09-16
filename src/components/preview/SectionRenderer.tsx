@@ -93,14 +93,20 @@ function EntriesLayout({ desc, entries }: { desc: SectionDescriptor; entries: En
         }
 
         return (
-          <article key={entry.id} className="entry-block">
+          <article key={entry.id} data-entry-id={entry.id} className="entry-block">
             <div className="entry-head flex items-baseline justify-between gap-3">
-              <h3 className="text-body font-semibold text-ink">{primary}</h3>
+              <h3
+                data-select-entry={desc.key}
+                data-entry-label={primary}
+                className="selectable-block cursor-pointer rounded-[6px] text-body font-semibold text-ink transition-[background-color,box-shadow] duration-100"
+              >
+                {primary}
+              </h3>
               {dates && <span className="tnum shrink-0 text-small text-ink-muted">{dates}</span>}
             </div>
 
             {(sub || tags.length > 0) && (
-              <div className="entry-head mt-px flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-ink-muted">
+              <div className="entry-head sub-meta mt-px flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-ink-muted">
                 {sub && <span>{sub}</span>}
                 {tags.map((t) => (
                   <span key={t} className="rounded border border-line px-1 text-micro">
@@ -111,7 +117,7 @@ function EntriesLayout({ desc, entries }: { desc: SectionDescriptor; entries: En
             )}
 
             {bodies.map((b, i) => (
-              <p key={i} className="mt-px whitespace-pre-line text-small text-ink-muted">
+              <p key={i} className="sub-meta mt-px whitespace-pre-line text-small text-ink-muted">
                 {b}
               </p>
             ))}
@@ -119,7 +125,11 @@ function EntriesLayout({ desc, entries }: { desc: SectionDescriptor; entries: En
             {bullets.length > 0 && (
               <ul className="mt-0 space-y-0">
                 {bullets.map((b, i) => (
-                  <li key={i} className="flex gap-1.5 text-body text-ink">
+                  <li
+                    key={i}
+                    data-bullet-index={i}
+                    className="selectable-block flex cursor-pointer gap-1.5 rounded-[6px] text-body text-ink transition-[background-color,box-shadow] duration-100"
+                  >
                     <span className="select-none text-ink-soft">•</span>
                     <span className="flex-1">{b}</span>
                   </li>
