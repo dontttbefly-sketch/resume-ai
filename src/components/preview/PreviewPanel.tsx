@@ -37,7 +37,8 @@ export function PreviewPanel() {
       if (!sectionEl) continue;
       let target: HTMLElement | null = null;
       if (sel.level === "section") {
-        target = sectionEl.querySelector<HTMLElement>("[data-select-section]");
+        /* section 级：高亮整个模块（标题 + 全部条目） */
+        target = sectionEl;
       } else if (sel.level === "entry" && sel.entryId) {
         /* entry 级：高亮整个条目卡片（标题 + 灰字 + 全部要点） */
         target = sectionEl.querySelector<HTMLElement>(`[data-entry-id="${sel.entryId}"]`);
