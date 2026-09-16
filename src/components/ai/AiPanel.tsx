@@ -167,6 +167,12 @@ export function AiPanel() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
+  const placeholder = useMemo(() => {
+    if (thinking) return "AI 正在思考…";
+    if (selection && compact) return "说说哪里不满意…";
+    return "聊聊简历、经历…";
+  }, [thinking, selection, compact]);
+
   if (!panelMode) return null;
 
   const contextLabel = selection
@@ -253,12 +259,6 @@ export function AiPanel() {
       prev.map((mm, i) => (i === prev.length - 1 ? { ...mm, appliedIndex: idx } : mm)),
     );
   }
-
-  const placeholder = useMemo(() => {
-    if (thinking) return "AI 正在思考…";
-    if (selection && compact) return "说说哪里不满意…";
-    return "聊聊简历、经历…";
-  }, [thinking, selection, compact]);
 
   return (
     <aside
