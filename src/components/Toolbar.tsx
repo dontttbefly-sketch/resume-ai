@@ -45,6 +45,7 @@ function MenuBtn({
 
 function AvatarMenu() {
   const [open, setOpen] = useState(false);
+  const setVaultOpen = useSelectionStore((s) => s.setVaultOpen);
   const ref = useRef<HTMLDivElement>(null);
 
   const sections = useResumeStore((s) => s.sections);
@@ -145,6 +146,18 @@ function AvatarMenu() {
             </MenuBtn>
           </div>
 
+          {/* 经历库 */}
+          <div className="border-b border-slate-100 px-2 py-2">
+            <MenuBtn
+              onClick={() => {
+                setVaultOpen(true);
+                setOpen(false);
+              }}
+            >
+              📖 经历库
+            </MenuBtn>
+          </div>
+
           {/* 账号 */}
           <div className="border-b border-slate-100 px-4 py-3">
             <AccountButton />
@@ -218,8 +231,7 @@ function ProfileBar() {
 /* ------------------------------ 顶栏 ------------------------------ */
 
 export function Toolbar() {
-  const setAiOpen = useSelectionStore((s) => s.setAiOpen);
-  const setVaultOpen = useSelectionStore((s) => s.setVaultOpen);
+  const openFull = useSelectionStore((s) => s.openFull);
   const [guideOpen, setGuideOpen] = useState(false);
 
   const requestExport = () => {
@@ -246,14 +258,7 @@ export function Toolbar() {
       <div className="ml-auto flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setVaultOpen(true)}
-          className="rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-700 active:scale-95"
-        >
-          经历库
-        </button>
-        <button
-          type="button"
-          onClick={() => setAiOpen(true)}
+          onClick={openFull}
           className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-sky-400 px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-[0_2px_10px_rgba(99,102,241,0.35)] transition-all duration-150 hover:brightness-110 active:scale-95"
         >
           ✦ AI

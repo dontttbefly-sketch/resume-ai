@@ -253,3 +253,9 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* 思考话术轮换淡入 */
+@keyframes thinking-fade {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
