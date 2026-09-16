@@ -154,6 +154,80 @@ ${RULES}
 请在回复的最后**另起一行**附上这一行标记（没有新经历就不要加）：
 <<EXP:公司名|项目名|一句话摘要>>`;
 
+/** 轻量 Markdown 渲染（AI 回复里常见 **粗体**、列表、标题） */
+function inlineNodes(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[0].startsWith("**")) {
+      parts.push(
+        <strong key={k++} className="font-semibold text-slate-900">
+          {m[0].slice(2, -2)}
+        </strong>,
+      );
+    } else {
+      parts.push(
+        <code key={k++} className="rounded bg-slate-200/80 px-1 py-px font-mono text-[11px] text-slate-600">
+          {m[0].slice(1, -1)}
+        </code>,
+      );
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function MdText({ text }: { text: string }) {
+  const out: React.ReactNode[] = [];
+  let list: React.ReactNode[] = [];
+  const flush = () => {
+    if (list.length) {
+      out.push(
+        <ul key={out.length} className="my-1 ml-1 list-disc space-y-0.5 pl-4 marker:text-slate-300">
+          {list}
+        </ul>,
+      );
+      list = [];
+    }
+  };
+  text.split("\n").forEach((line, i) => {
+    const t = line.trim();
+    if (!t) {
+      flush();
+      return;
+    }
+    const ul = t.match(/^[-•]\s+(.*)/);
+    const ol = t.match(/^(\d+)[.、)]\s+(.*)/);
+    const h = t.match(/^#{1,4}\s+(.*)/);
+    if (ul) {
+      list.push(<li key={i}>{inlineNodes(ul[1])}</li>);
+      return;
+    }
+    if (ol) {
+      list.push(<li key={i} className="list-decimal">{inlineNodes(ol[2])}</li>);
+      return;
+    }
+    if (h) {
+      flush();
+      out.push(
+        <p key={i} className="mb-0.5 mt-1.5 text-[13px] font-semibold tracking-tight text-slate-800">
+          {inlineNodes(h[1])}
+        </p>,
+      );
+      return;
+    }
+    flush();
+    out.push(<p key={i}>{inlineNodes(t)}</p>);
+  });
+  flush();
+  return <div className="space-y-1">{out}</div>;
+}
+
 /** 可折叠的思考过程（深度思考的证明） */
 function ReasoningBlock({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -174,7 +248,7 @@ function ReasoningBlock({ text }: { text: string }) {
         }
       >
         <div className="overflow-hidden">
-          <p className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-slate-200/60 px-3.5 py-2 text-[11px] leading-relaxed text-slate-400">
+          <p className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-slate-200/60 px-3.5 py-2.5 font-mono text-[10.5px] leading-[1.8] tracking-wide text-slate-400">
             {text}
           </p>
         </div>
@@ -414,14 +488,14 @@ export function AiPanel() {
             <div key={i} className="space-y-2">
               {m.reasoning && <ReasoningBlock text={m.reasoning} />}
               {m.text && (
-                <p
+                <div
                   className={
-                    "whitespace-pre-wrap rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2 text-[12.5px] leading-relaxed " +
+                    "rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2.5 text-[12.5px] leading-[1.75] " +
                     (m.error ? "text-rose-500" : "text-slate-700")
                   }
                 >
-                  {m.text}
-                </p>
+                  {m.error ? m.text : <MdText text={m.text} />}
+                </div>
               )}
               {/* 挖掘到的经历 → 确认后存入经历库 */}
               {m.exp && (<>
