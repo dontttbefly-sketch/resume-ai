@@ -109,6 +109,13 @@ export function PreviewPanel() {
           article.querySelector("[data-select-entry]")?.getAttribute("data-entry-label") ?? "";
         const sk = sectionEl.dataset.sectionKey!;
         const eid = article.dataset.entryId!;
+        const key = selectionKey({ level: "bullet", sectionKey: sk, entryId: eid, bulletIndex: idx, sectionLabel: "" });
+        /* 判断这次是取消分支（store 中已有该 key）→ 冻结 hover 200ms 避免同位置 hover 抢视觉 */
+        const cur = useSelectionStore.getState();
+        if (cur.selections.some((x) => x.key === key)) {
+          article.classList.add("hover-frozen");
+          window.setTimeout(() => article.classList.remove("hover-frozen"), 200);
+        }
         toggle({
           level: "bullet",
           sectionKey: sk,
@@ -117,7 +124,7 @@ export function PreviewPanel() {
           entryLabel,
           bulletIndex: idx,
           bulletText: bulletLi.textContent?.replace(/^•/, "").trim() ?? "",
-          key: selectionKey({ level: "bullet", sectionKey: sk, entryId: eid, bulletIndex: idx, sectionLabel: "" }),
+          key,
         });
         return;
       }
@@ -130,13 +137,23 @@ export function PreviewPanel() {
         e.stopPropagation();
         const sk = sectionEl.dataset.sectionKey!;
         const eid = article.dataset.entryId!;
+        const key = selectionKey({ level: "entry", sectionKey: sk, entryId: eid, sectionLabel: "" });
+        const cur = useSelectionStore.getState();
+        if (cur.selections.some((x) => x.key === key)) {
+          article.classList.add("hover-frozen");
+          sectionEl.classList.add("hover-frozen");
+          window.setTimeout(() => {
+            article.classList.remove("hover-frozen");
+            sectionEl.classList.remove("hover-frozen");
+          }, 200);
+        }
         toggle({
           level: "entry",
           sectionKey: sk,
           sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
           entryId: eid,
           entryLabel: entryH3.getAttribute("data-entry-label") ?? "",
-          key: selectionKey({ level: "entry", sectionKey: sk, entryId: eid, sectionLabel: "" }),
+          key,
         });
         return;
       }
@@ -145,11 +162,18 @@ export function PreviewPanel() {
       e.preventDefault();
       e.stopPropagation();
       const sk = sectionH2.dataset.selectSection!;
+      const key = selectionKey({ level: "section", sectionKey: sk, sectionLabel: "" });
+      const sectionEl = sectionH2.closest<HTMLElement>("[data-section-key]");
+      const cur = useSelectionStore.getState();
+      if (sectionEl && cur.selections.some((x) => x.key === key)) {
+        sectionEl.classList.add("hover-frozen");
+        window.setTimeout(() => sectionEl.classList.remove("hover-frozen"), 200);
+      }
       toggle({
         level: "section",
         sectionKey: sk,
         sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
-        key: selectionKey({ level: "section", sectionKey: sk, sectionLabel: "" }),
+        key,
       });
       return;
     }
