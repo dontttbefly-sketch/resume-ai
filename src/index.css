@@ -238,14 +238,14 @@ body {
 .resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
 .resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before { opacity: 1; }
 
-/* selected：完全抬起（夸张版：抬得高、影子大、渐变深） */
+/* selected：完全抬起（渐变加深，仍走同一个 ::before 层） */
 .block-selected {
-  transform: translateY(-4px) !important;
-  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.3) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.2) !important;
 }
 .block-selected::before {
   opacity: 1;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.32) 88%);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.22) 88%);
 }
 
 /* 已选中的块：内部不再触发二次抬起（用涟漪替代） */
