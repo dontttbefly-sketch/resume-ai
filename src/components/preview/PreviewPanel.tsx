@@ -72,14 +72,6 @@ export function PreviewPanel() {
         target.dataset.level = sel.level;
         if (thinking) target.classList.add(THINKING_CLASS);
         elsRef.current.push(target);
-        /* bullet 级 → 父卡片也加标记（视觉强化） */
-        if (sel.level === "bullet") {
-          const card = target.closest<HTMLElement>("[data-entry-id]");
-          if (card && !card.classList.contains("block-selected-card")) {
-            card.classList.add("block-selected-card");
-            elsRef.current.push(card);
-          }
-        }
       }
     }
   }, [selections, thinking]);

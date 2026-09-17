@@ -236,26 +236,13 @@ body {
 /* ---------- 选中 = 定格态（留痕加强：线更实、晕染更清晰） ---------- */
 .block-selected::before {
   opacity: 1 !important;
-  border-left: 3px solid rgba(99, 102, 241, 0.85) !important;
-  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.17), rgba(99, 102, 241, 0.03) 70%) !important;
+  border-left: 3px solid rgba(99, 102, 241, 0.6) !important;
+  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02) 70%) !important;
 }
 .block-selected[data-level="bullet"]::before { border-left-width: 2.5px !important; }
 
-/* bullet 选中的 article 父级：自动应用定格视觉（CSS :has 零 JS） */
-.resume-paper [data-entry-id]:has(ul li.block-selected)::before {
-  opacity: 1 !important;
-  border-left: 3.5px solid rgba(99, 102, 241, 0.85) !important;
-  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.17), rgba(99, 102, 241, 0.03) 70%) !important;
-}
 .block-selected[data-level="entry"]::before { border-left-width: 3.5px !important; }
 .block-selected[data-level="section"]::before { border-left-width: 5px !important; }
-
-/* 已选中的块：只抑制内部子元素 ::before（不让嵌套 hover 预览再叠加） */
-.resume-paper .block-selected > [data-bullet-index]::before,
-.resume-paper .block-selected > [data-entry-id]::before,
-.resume-paper .block-selected > [data-select-section]::before {
-  opacity: 0 !important;
-}
 
 /* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
 
