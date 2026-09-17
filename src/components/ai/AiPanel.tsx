@@ -16,6 +16,7 @@ import { chatFull, LlmError } from "../../lib/llm";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { useResumeStore } from "../../store/useResumeStore";
 import { useExperienceStore } from "../../store/useExperienceStore";
+import { SECTIONS } from "../../data/sections";
 
 interface Candidate {
   text?: string;
@@ -296,6 +297,23 @@ export function AiPanel() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
+  /* 选区按简历文档顺序排列（而非点击顺序） */
+  const sortedSelections = useMemo(() => {
+    const secIdx = (k: string) => SECTIONS.findIndex((d) => d.key === k);
+    const entryIdx = (sel: (typeof selections)[number]) => {
+      const arr = sections[sel.sectionKey] ?? [];
+      return sel.entryId ? arr.findIndex((e) => e.id === sel.entryId) : -1;
+    };
+    return [...selections].sort((a, b) => {
+      const d = secIdx(a.sectionKey) - secIdx(b.sectionKey);
+      if (d) return d;
+      if (a.level === "section" || b.level === "section") return a.level === "section" ? -1 : 1;
+      const e = entryIdx(a) - entryIdx(b);
+      if (e) return e;
+      return (a.bulletIndex ?? -1) - (b.bulletIndex ?? -1);
+    });
+  }, [selections, sections]);
+
   const placeholder = useMemo(() => {
     if (thinking) return "AI 正在思考…";
     if (selections.length > 0) return "说说对选中部分的想法…";
@@ -313,7 +331,7 @@ export function AiPanel() {
           : selections[0].level === "entry"
             ? `${selections[0].entryLabel}（整段）`
             : selections[0].sectionLabel
-        : `已选 ${selections.length} 块`;
+        : `已选 ${sortedSelections.length} 块`;
 
   async function submit() {
     const feedback = input.trim();
@@ -322,13 +340,13 @@ export function AiPanel() {
     setMessages((m) => [...m, { role: "user", text: feedback }]);
     setThinking(true);
 
-    const isImprove = selections.length > 0;
+    const isImprove = sortedSelections.length > 0;
     try {
       let userContent: string;
       if (isImprove) {
-        /* 多选：拼接所有选中的内容 */
+        /* 多选：按文档顺序拼接所有选中的内容 */
         const parts: string[] = [];
-        for (const sel of selections) {
+        for (const sel of sortedSelections) {
           if (sel.level === "bullet") {
             parts.push(`【${sel.entryLabel} · 第 ${(sel.bulletIndex ?? 0) + 1} 条】${sel.bulletText}`);
           } else if (sel.level === "entry") {
@@ -392,7 +410,7 @@ export function AiPanel() {
   }
 
   function applyCandidate(idx: number, text: string) {
-    const bulletSel = selections.find((x) => x.level === "bullet");
+    const bulletSel = sortedSelections.find((x) => x.level === "bullet");
     if (bulletSel) {
       setBullet(bulletSel.sectionKey as never, bulletSel.entryId!, "bullets", bulletSel.bulletIndex!, text);
     }
@@ -427,18 +445,18 @@ export function AiPanel() {
       </div>
 
       {/* 选区标签行（多选 chips，像飞书引用） */}
-      {selections.length > 0 && (
+      {sortedSelections.length > 0 && (
         <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-4 py-2">
-          {selections.map((sel) => (
+          {sortedSelections.map((sel) => (
             <span
               key={sel.key}
               className="group inline-flex max-w-full items-center gap-1 rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-600 ring-1 ring-violet-200/70"
             >
               <span className="truncate">
                 {sel.level === "bullet"
-                  ? `#${sel.entryLabel}·第${(sel.bulletIndex ?? 0) + 1}条`
+                  ? `#${sel.entryLabel || sel.sectionLabel}·第${(sel.bulletIndex ?? 0) + 1}条`
                   : sel.level === "entry"
-                    ? `#${sel.entryLabel} 整段`
+                    ? `#${sel.entryLabel || sel.sectionLabel} 整段`
                     : `#${sel.sectionLabel} 整块`}
               </span>
               <button
