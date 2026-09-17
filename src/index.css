@@ -249,8 +249,8 @@ body {
 .block-selected::after {
   content: "";
   position: absolute;
-  inset: -3px -12px;
-  border-radius: 14px;
+  inset: -3px -6px;
+  border-radius: 12px;
   background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.2) 92%);
   box-shadow: 0 3px 18px rgba(99, 102, 241, 0.2);
   pointer-events: none;
