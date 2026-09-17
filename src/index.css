@@ -194,10 +194,10 @@ body {
  * 设计语言：苹果式 —— 圆润、克制、精致
  * ========================================================================== */
 
-/* ---------- 简历内可点区域：单层抬起模型 ----------
-   hover = 将要抬起（-1px / 淡渐变 / 小阴影）
-   selected = 完全抬起（-2px / 深渐变 / 大阴影）
-   视觉只有一层渐变（::before），阴影/上浮在元素自身，无叠加层
+/* ---------- 简历内可点区域：左侧标记线 + 底色晕染（平躺，无浮起） ----------
+   层级编码：竖线粗细 + 底色深浅 —— bullet 2px / entry 3.5px / section 5px
+   悬停 = 预览（线 40% 透明度）；选中 = 定格（线 75% 透明度）
+   范围统一：晕染层外扩 6px（视觉与点击边界的中间值）
 */
 .resume-paper [data-bullet-index],
 .resume-paper [data-select-entry],
@@ -206,12 +206,10 @@ body {
 .resume-paper [data-section-key] {
   position: relative;
   border-radius: 10px;
-  transition:
-    transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
-    box-shadow 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: background-image 300ms ease;
 }
 
-/* 唯一的渐变视觉层 */
+/* 晕染层（伪元素承载，opacity 平滑过渡） */
 .resume-paper [data-bullet-index]::before,
 .resume-paper [data-select-entry]::before,
 .resume-paper [data-select-section]::before,
@@ -221,43 +219,36 @@ body {
   position: absolute;
   inset: -3px -6px;
   border-radius: 12px;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.1) 88%);
+  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.07), rgba(99, 102, 241, 0.01) 70%);
   opacity: 0;
-  transition: opacity 300ms ease, background-image 300ms ease;
+  transition: opacity 300ms ease;
   pointer-events: none;
+  border-left: 2px solid rgba(99, 102, 241, 0.4);
 }
 
-/* hover：将要抬起 */
-.resume-paper [data-bullet-index]:hover,
-.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover)),
-.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover)) {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.12);
-}
+/* 悬停 = 预览态 */
 .resume-paper [data-bullet-index]:hover::before,
 .resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
-.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before { opacity: 1; }
-
-/* selected：完全抬起（渐变加深，仍走同一个 ::before 层） */
-.block-selected {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.2) !important;
+.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before {
+  opacity: 1;
 }
+
+/* ---------- 选中 = 定格态（线更粗更实，晕染稍深） ---------- */
 .block-selected::before {
   opacity: 1;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.22) 88%);
+  border-left-color: rgba(99, 102, 241, 0.75);
+  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.13), rgba(99, 102, 241, 0.02) 70%);
 }
+.block-selected[data-level="bullet"]::before { border-left-width: 2.5px; }
+.block-selected[data-level="entry"]::before { border-left-width: 3.5px; }
+.block-selected[data-level="section"]::before { border-left-width: 5px; }
 
-/* 已选中的块：内部不再触发二次抬起（用涟漪替代） */
+/* 已选中的块：内部不再触发悬停预览（已定格） */
 .resume-paper .block-selected ::before {
   opacity: 0 !important;
 }
-.resume-paper .block-selected [data-bullet-index]:hover,
-.resume-paper .block-selected [data-entry-id]:hover,
-.resume-paper .block-selected [data-select-section]:hover {
-  transform: none;
-  box-shadow: none;
-}
+
+/* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
 
 /* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
 
