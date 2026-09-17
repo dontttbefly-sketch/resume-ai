@@ -49,7 +49,7 @@ export function PreviewPanel() {
 
   /** 选区 → DOM 高亮同步（支持多个） */
   useEffect(() => {
-    elsRef.current.forEach((el) => el.classList.remove(SELECTED_CLASS, THINKING_CLASS));
+    elsRef.current.forEach((el) => el.classList.remove(SELECTED_CLASS, THINKING_CLASS, "block-selected-card"));
     elsRef.current = [];
 
     for (const sel of selections) {
@@ -72,6 +72,14 @@ export function PreviewPanel() {
         target.dataset.level = sel.level;
         if (thinking) target.classList.add(THINKING_CLASS);
         elsRef.current.push(target);
+        /* bullet 级 → 父卡片也加标记（视觉强化） */
+        if (sel.level === "bullet") {
+          const card = target.closest<HTMLElement>("[data-entry-id]");
+          if (card && !card.classList.contains("block-selected-card")) {
+            card.classList.add("block-selected-card");
+            elsRef.current.push(card);
+          }
+        }
       }
     }
   }, [selections, thinking]);
