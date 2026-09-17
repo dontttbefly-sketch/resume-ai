@@ -113,8 +113,13 @@ export function PreviewPanel() {
         /* 判断这次是取消分支（store 中已有该 key）→ 冻结 hover 200ms 避免同位置 hover 抢视觉 */
         const cur = useSelectionStore.getState();
         if (cur.selections.some((x) => x.key === key)) {
+          /* 取消：冻结到鼠标离开为止 */
           article.classList.add("hover-frozen");
-          window.setTimeout(() => article.classList.remove("hover-frozen"), 200);
+          const unfreeze = () => {
+            article.classList.remove("hover-frozen");
+            article.removeEventListener("mouseleave", unfreeze);
+          };
+          article.addEventListener("mouseleave", unfreeze);
         }
         toggle({
           level: "bullet",
@@ -140,12 +145,17 @@ export function PreviewPanel() {
         const key = selectionKey({ level: "entry", sectionKey: sk, entryId: eid, sectionLabel: "" });
         const cur = useSelectionStore.getState();
         if (cur.selections.some((x) => x.key === key)) {
+          /* 取消：冻结到鼠标离开为止 */
           article.classList.add("hover-frozen");
           sectionEl.classList.add("hover-frozen");
-          window.setTimeout(() => {
+          const unfreeze = () => {
             article.classList.remove("hover-frozen");
             sectionEl.classList.remove("hover-frozen");
-          }, 200);
+            article.removeEventListener("mouseleave", unfreeze);
+            sectionEl.removeEventListener("mouseleave", unfreeze);
+          };
+          article.addEventListener("mouseleave", unfreeze);
+          sectionEl.addEventListener("mouseleave", unfreeze);
         }
         toggle({
           level: "entry",
@@ -167,7 +177,11 @@ export function PreviewPanel() {
       const cur = useSelectionStore.getState();
       if (sectionEl && cur.selections.some((x) => x.key === key)) {
         sectionEl.classList.add("hover-frozen");
-        window.setTimeout(() => sectionEl.classList.remove("hover-frozen"), 200);
+        const unfreeze = () => {
+          sectionEl.classList.remove("hover-frozen");
+          sectionEl.removeEventListener("mouseleave", unfreeze);
+        };
+        sectionEl.addEventListener("mouseleave", unfreeze);
       }
       toggle({
         level: "section",
