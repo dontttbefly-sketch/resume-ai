@@ -194,8 +194,9 @@ body {
  * 设计语言：苹果式 —— 圆润、克制、精致
  * ========================================================================== */
 
-/* ---------- 简历内可点区域：圆润凸起（悬浮感）+ 伪元素渐变（300ms 缓慢浮现） ----------
-   层级闭环：悬停/点击 段落→段落、条目区域→整条目、模块区域→整模块
+/* ---------- 简历内可点区域：圆润胶囊 + 伪元素渐变（300ms 缓慢浮现） ----------
+   层级闭环（hover 与点击一致）：段落→段落、条目区域→整条目、模块区域→整模块
+   范围统一：渐变层外扩 6px（视觉与点击边界的中间值）
 */
 .resume-paper [data-bullet-index],
 .resume-paper [data-select-entry],
@@ -209,6 +210,7 @@ body {
     box-shadow 300ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* hover 淡渐变层（伪元素承载，opacity 可平滑过渡） */
 .resume-paper [data-bullet-index]::before,
 .resume-paper [data-select-entry]::before,
 .resume-paper [data-select-section]::before,
@@ -216,33 +218,25 @@ body {
 .resume-paper [data-section-key]::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: 10px;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.1) 92%);
+  inset: -3px -6px;
+  border-radius: 12px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.1) 88%);
   opacity: 0;
   transition: opacity 300ms ease;
   pointer-events: none;
 }
 
-/* 悬停：轻微上浮；阴影放在圆润的伪元素上（凸起感） */
-.resume-paper [data-bullet-index]:hover,
-.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover)),
-.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover)) {
-  transform: translateY(-1px);
-}
-.resume-paper [data-bullet-index]:hover::before,
-.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
-.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before {
-  opacity: 1;
-  box-shadow: 0 2px 14px rgba(99, 102, 241, 0.13);
-}
-.resume-paper [data-bullet-index]:hover::before,
-.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
+/* 悬停分段落：只亮这一段 */
+.resume-paper [data-bullet-index]:hover::before { opacity: 1; }
+
+/* 悬停条目内非段落区域：整个条目亮 */
+.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before { opacity: 1; }
+
+/* 悬停模块内非条目区域：整个模块亮 */
 .resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before { opacity: 1; }
 
-/* ---------- 选中态：深渐变 + 持续轻凸起（350ms 渐显） ---------- */
+/* ---------- 选中态：比 hover 凸得更多（-2px/20%），过渡由基础 transition 承担 ---------- */
 .block-selected {
-  /* 选中 = 比 hover 凸得更多（过渡由元素基础 transition 承担） */
   transform: translateY(-2px) !important;
   box-shadow: 0 3px 18px rgba(99, 102, 241, 0.2) !important;
 }
@@ -257,15 +251,18 @@ body {
   animation: vault-fade-in 350ms ease;
 }
 
-/* 灰字区域（职位/城市等 meta）：不可点，点击穿透 */
-.resume-paper .sub-meta {
-  pointer-events: none;
+/* ---------- 已选中的块：抑制二次浮起与 hover 渐变（已浮起，用涟漪替代） ---------- */
+.resume-paper .block-selected::before,
+.resume-paper .block-selected ::before {
+  opacity: 0 !important;
+}
+.resume-paper .block-selected [data-bullet-index]:hover,
+.resume-paper .block-selected [data-entry-id]:hover,
+.resume-paper .block-selected [data-select-section]:hover {
+  transform: none;
 }
 
-/* ---------- 选中态：更深的同向渐变 ---------- */
-.block-selected {
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.20) 96%) !important;
-}
+/* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
 
 /* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
 .block-thinking {
