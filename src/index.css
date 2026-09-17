@@ -237,7 +237,9 @@ body {
 
 /* ---------- 选中态：深渐变 + 持续轻凸起（350ms 渐显） ---------- */
 .block-selected {
-  box-shadow: 0 2px 14px rgba(99, 102, 241, 0.16) !important;
+  /* 选中 = 比 hover 凸得更多（过渡由元素基础 transition 承担） */
+  transform: translateY(-2px) !important;
+  box-shadow: 0 3px 18px rgba(99, 102, 241, 0.2) !important;
 }
 .block-selected::after {
   content: "";
