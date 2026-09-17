@@ -94,6 +94,10 @@ export function PreviewPanel() {
     const entryH3 = target.closest<HTMLElement>("[data-select-entry]");
     const sectionH2 = target.closest<HTMLElement>("[data-select-section]");
 
+    /* 清掉所有 bullet 联动的父卡片 class（再由 toggle 决定是否重新加） */
+    document
+      .querySelectorAll<HTMLElement>(".block-selected-card")
+      .forEach((el) => el.classList.remove("block-selected-card"));
     if (bulletLi) {
       const article = bulletLi.closest<HTMLElement>("[data-entry-id]");
       const sectionEl = bulletLi.closest<HTMLElement>("[data-section-key]");
