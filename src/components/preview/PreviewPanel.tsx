@@ -69,6 +69,7 @@ export function PreviewPanel() {
       }
       if (target) {
         target.classList.add(SELECTED_CLASS);
+        target.dataset.level = sel.level;
         if (thinking) target.classList.add(THINKING_CLASS);
         elsRef.current.push(target);
       }
@@ -205,7 +206,14 @@ export function PreviewPanel() {
           (panelOpen ? "lg:pr-[420px]" : "")
         }
       >
-        <div className="resume-paper relative mx-auto">
+        <div
+          className="resume-paper relative mx-auto"
+          style={{
+            transform: `scale(${panelOpen ? 0.88 : 1})`,
+            transformOrigin: "top center",
+            transition: "transform 300ms cubic-bezier(0.32,0.72,0,1)",
+          }}
+        >
           <div className="no-print pointer-events-none absolute inset-x-[14mm] top-[283mm] border-t border-dashed border-rose-300/70" />
           <div ref={measureRef} className="paper-content">
             <ResumeDocument />
