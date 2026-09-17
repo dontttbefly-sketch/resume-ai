@@ -194,18 +194,54 @@ body {
  * 设计语言：苹果式 —— 圆润、克制、精致
  * ========================================================================== */
 
-/* ---------- 简历内可点段落：左白右蓝渐变（hover 淡 / 选中深） ---------- */
+/* ---------- 简历内可点区域：伪元素渐变层（300ms 缓慢浮现） ----------
+   悬停逻辑（:has 联动）：
+   - 悬停某一段 → 只亮这一段
+   - 悬停条目内非段落区域（标题/灰字/空白）→ 整个条目亮
+   - 悬停模块内非条目区域（模块标题/条目间空白）→ 整个模块亮
+*/
 .resume-paper [data-bullet-index],
 .resume-paper [data-select-entry],
 .resume-paper [data-select-section],
-.resume-paper [data-entry-id] {
+.resume-paper [data-entry-id],
+.resume-paper [data-section-key] {
+  position: relative;
   border-radius: 6px;
-  transition: background-image 200ms ease;
 }
-.resume-paper [data-bullet-index]:hover,
-.resume-paper [data-select-entry]:hover,
-.resume-paper [data-select-section]:hover {
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.09) 92%);
+
+.resume-paper [data-bullet-index]::before,
+.resume-paper [data-select-entry]::before,
+.resume-paper [data-select-section]::before,
+.resume-paper [data-entry-id]::before,
+.resume-paper [data-section-key]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.1) 92%);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+/* 段落悬停：只亮这一段 */
+.resume-paper [data-bullet-index]:hover::before { opacity: 1; }
+
+/* 悬停在条目内（但不在任何一段上）→ 整个条目亮 */
+.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before { opacity: 1; }
+
+/* 悬停在模块内（但不在任何条目上）→ 整个模块亮 */
+.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before { opacity: 1; }
+
+/* ---------- 选中态：深渐变（出现时 350ms 渐显，不突兀） ---------- */
+.block-selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.2) 96%);
+  pointer-events: none;
+  animation: vault-fade-in 350ms ease;
 }
 
 /* 灰字区域（职位/城市等 meta）：不可点，点击穿透 */
