@@ -194,19 +194,18 @@ body {
  * 设计语言：苹果式 —— 圆润、克制、精致
  * ========================================================================== */
 
-/* ---------- 简历内可点段落的悬停暗示 ---------- */
+/* ---------- 简历内可点段落：左白右蓝渐变（hover 淡 / 选中深） ---------- */
 .resume-paper [data-bullet-index],
 .resume-paper [data-select-entry],
-.resume-paper [data-select-section] {
-  position: relative;
+.resume-paper [data-select-section],
+.resume-paper [data-entry-id] {
   border-radius: 6px;
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition: background-image 200ms ease;
 }
 .resume-paper [data-bullet-index]:hover,
 .resume-paper [data-select-entry]:hover,
 .resume-paper [data-select-section]:hover {
-  background-color: rgba(14, 165, 233, 0.05);
-  box-shadow: -2px 0 0 0 rgb(14 165 233 / 0.55);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.09) 92%);
 }
 
 /* 灰字区域（职位/城市等 meta）：不可点，点击穿透 */
@@ -214,10 +213,9 @@ body {
   pointer-events: none;
 }
 
-/* ---------- 选中态 ---------- */
+/* ---------- 选中态：更深的同向渐变 ---------- */
 .block-selected {
-  background-color: rgba(14, 165, 233, 0.08) !important;
-  box-shadow: -2.5px 0 0 0 rgb(14 165 233) !important;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.20) 96%) !important;
 }
 
 /* ---------- AI 思考中：选区高斯模糊 + 轻微下沉 ---------- */
