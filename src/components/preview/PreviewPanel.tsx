@@ -120,7 +120,45 @@ export function PreviewPanel() {
       });
       return;
     }
-    /* 点在空白处：清空选区 + 关闭面板 */
+    /* 点在条目内的空白（非段落）→ 选中整个条目 */
+    const hitArticle = target.closest<HTMLElement>("[data-entry-id]");
+    if (hitArticle) {
+      const sectionEl = hitArticle.closest<HTMLElement>("[data-section-key]");
+      if (sectionEl) {
+        e.preventDefault();
+        e.stopPropagation();
+        const sk = sectionEl.dataset.sectionKey!;
+        const eid = hitArticle.dataset.entryId!;
+        const entryLabel =
+          hitArticle.querySelector("[data-select-entry]")?.getAttribute("data-entry-label") ?? "";
+        toggle({
+          level: "entry",
+          sectionKey: sk,
+          sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
+          entryId: eid,
+          entryLabel,
+          key: selectionKey({ level: "entry", sectionKey: sk, entryId: eid, sectionLabel: "" }),
+        });
+        return;
+      }
+    }
+
+    /* 点在模块内（条目之外的空白）→ 选中整个模块 */
+    const hitSection = target.closest<HTMLElement>("[data-section-key]");
+    if (hitSection) {
+      e.preventDefault();
+      e.stopPropagation();
+      const sk = hitSection.dataset.sectionKey!;
+      toggle({
+        level: "section",
+        sectionKey: sk,
+        sectionLabel: (SECTION_MAP as Record<string, { label: string }>)[sk]?.label ?? "",
+        key: selectionKey({ level: "section", sectionKey: sk, sectionLabel: "" }),
+      });
+      return;
+    }
+
+    /* 点在纸张空白：清空选区 + 关闭面板 */
     if (target === paper || target.classList.contains("paper-content")) {
       close();
     }
