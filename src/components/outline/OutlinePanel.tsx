@@ -206,17 +206,17 @@ export function OutlinePanel() {
   );
 
   return (
-    <aside className="no-print flex w-[248px] shrink-0 flex-col border-r border-slate-200/70 bg-gradient-to-b from-slate-50/90 to-white/60 backdrop-blur-xl">
+    <aside className="no-print flex w-[300px] shrink-0 flex-col border-r border-slate-200/70 bg-gradient-to-b from-slate-50/90 to-white/60 backdrop-blur-xl">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 px-4 pb-2 pt-4">
+        <div className="shrink-0 px-5 pb-3 pt-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">简历结构</p>
           <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
             点击中间简历的任意段落，让 AI 改进它
           </p>
         </div>
-        <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-6">
+        <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8">
           {visibleSections.map((desc) => (
-            <div key={desc.key} className="mb-4">
+            <div key={desc.key} className="mb-5">
               <button
                 type="button"
                 onClick={() =>
@@ -228,7 +228,7 @@ export function OutlinePanel() {
                 <span className="text-[12.5px] font-semibold text-slate-600">{desc.label}</span>
                 <span className="text-[10px] text-slate-300">整块 ✦</span>
               </button>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {(sections[desc.key] ?? []).map((entry) => (
                   <EntryCard
                     key={entry.id}

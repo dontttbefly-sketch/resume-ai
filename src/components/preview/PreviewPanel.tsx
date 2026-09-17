@@ -142,7 +142,7 @@ export function PreviewPanel() {
 
       <div
         className={
-          "app-preview-scroll thin-scroll min-h-0 flex-1 overflow-auto px-6 py-6 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] " +
+          "app-preview-scroll thin-scroll min-h-0 flex-1 overflow-auto px-10 py-10 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] " +
           (panelOpen ? "lg:pr-[420px]" : "")
         }
       >
