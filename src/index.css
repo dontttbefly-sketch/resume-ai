@@ -224,12 +224,17 @@ body {
   pointer-events: none;
 }
 
-/* 悬停：轻微上浮 + 柔和阴影（凸起感，诱惑点击） */
+/* 悬停：轻微上浮；阴影放在圆润的伪元素上（凸起感） */
 .resume-paper [data-bullet-index]:hover,
 .resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover)),
 .resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover)) {
   transform: translateY(-1px);
-  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.12);
+}
+.resume-paper [data-bullet-index]:hover::before,
+.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
+.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before {
+  opacity: 1;
+  box-shadow: 0 2px 14px rgba(99, 102, 241, 0.13);
 }
 .resume-paper [data-bullet-index]:hover::before,
 .resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
@@ -244,9 +249,10 @@ body {
 .block-selected::after {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: 10px;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.2) 96%);
+  inset: -3px -12px;
+  border-radius: 14px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(99, 102, 241, 0.2) 92%);
+  box-shadow: 0 3px 18px rgba(99, 102, 241, 0.2);
   pointer-events: none;
   animation: vault-fade-in 350ms ease;
 }
@@ -313,4 +319,20 @@ body {
 @keyframes think-dot {
   0%, 100% { transform: translateY(0); opacity: 0.4; }
   50% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ---------- 选中块内的鼠标涟漪（轻量粒子感） ---------- */
+.select-ripple {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.4), rgba(99, 102, 241, 0));
+  pointer-events: none;
+  animation: ripple-out 700ms ease-out forwards;
+}
+@keyframes ripple-out {
+  from { transform: scale(0.4); opacity: 0.9; }
+  to { transform: scale(2.8); opacity: 0; }
 }

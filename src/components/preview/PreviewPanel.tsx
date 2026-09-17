@@ -26,6 +26,26 @@ export function PreviewPanel() {
   const thinking = useSelectionStore((s) => s.thinking);
   const panelOpen = useSelectionStore((s) => s.panelOpen);
   const elsRef = useRef<HTMLElement[]>([]);
+  const lastRippleRef = useRef(0);
+
+  /** 已选中的块内飘过 → 轻涟漪（它们已浮起，不再二次触发浮起） */
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (useSelectionStore.getState().thinking) return;
+    const target = e.target as HTMLElement;
+    if (!target.closest(".block-selected")) return;
+    const paper = target.closest(".resume-paper");
+    if (!paper) return;
+    const now = Date.now();
+    if (now - lastRippleRef.current < 90) return;
+    lastRippleRef.current = now;
+    const pr = paper.getBoundingClientRect();
+    const dot = document.createElement("span");
+    dot.className = "select-ripple";
+    dot.style.left = `${e.clientX - pr.left}px`;
+    dot.style.top = `${e.clientY - pr.top}px`;
+    paper.appendChild(dot);
+    dot.addEventListener("animationend", () => dot.remove());
+  };
 
   /** 选区 → DOM 高亮同步（支持多个） */
   useEffect(() => {
@@ -168,6 +188,7 @@ export function PreviewPanel() {
     <section
       className="app-preview relative flex min-h-0 flex-1 flex-col bg-slate-200/60"
       onClick={handleClick}
+      onMouseMove={handleMouseMove}
     >
       {isOverflow && (
         <div className="no-print flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-[12px] text-amber-700">
