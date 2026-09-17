@@ -233,11 +233,11 @@ body {
   opacity: 1;
 }
 
-/* ---------- 选中 = 定格态（线更粗更实，晕染稍深） ---------- */
+/* ---------- 选中 = 定格态（留痕加强：线更实、晕染更清晰） ---------- */
 .block-selected::before {
   opacity: 1;
-  border-left-color: rgba(99, 102, 241, 0.75);
-  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.13), rgba(99, 102, 241, 0.02) 70%);
+  border-left-color: rgba(99, 102, 241, 0.85);
+  background-image: linear-gradient(to right, rgba(99, 102, 241, 0.17), rgba(99, 102, 241, 0.03) 70%);
 }
 .block-selected[data-level="bullet"]::before { border-left-width: 2.5px; }
 .block-selected[data-level="entry"]::before { border-left-width: 3.5px; }
