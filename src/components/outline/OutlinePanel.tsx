@@ -12,7 +12,6 @@ import { SECTIONS } from "../../data/sections";
 import { useResumeStore } from "../../store/useResumeStore";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { asString, readList } from "../../lib/resume";
-import { IconTrash } from "../icons";
 
 /** 就地编辑的一行文本：默认显示，点击变输入框 */
 function InlineEdit({
@@ -85,17 +84,10 @@ function EntryCard({
   const entry = useResumeStore((s) => s.sections[sectionKey]?.find((e) => e.id === entryId));
   const setField = useResumeStore((s) => s.setField);
   const setBullet = useResumeStore((s) => s.setBullet);
-  const removeEntry = useResumeStore((s) => s.removeEntry);
+  
   const [expanded, setExpanded] = useState(false);
-  const [exiting, setExiting] = useState(false);
 
   if (!entry) return null;
-
-  /** 删除整块：先播退场动效，动画结束后真正移除 */
-  const handleDelete = () => {
-    setExiting(true);
-    window.setTimeout(() => removeEntry(sectionKey as never, entryId), 280);
-  };
 
   const bulletList = readList(entry, "bullets");
 
@@ -114,12 +106,7 @@ function EntryCard({
   const end = asString(entry.values.end);
 
   return (
-    <div
-      className={
-        "group rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-150 hover:border-slate-300/80 hover:shadow-[0_2px_12px_rgba(15,23,42,0.06)] " +
-        (exiting ? "entry-exiting" : "")
-      }
-    >
+    <div className="group rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-150 hover:border-slate-300/80 hover:shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
       {/* 公司/学校名：inline 编辑 */}
       <InlineEdit
         value={title}
@@ -179,32 +166,19 @@ function EntryCard({
           </span>
         </button>
         {expanded && (
-          <div className="animate-[vault-fade-in_200ms_ease-out]">
-            <ul className="mt-1 space-y-1.5">
-              {bulletList.map((b, i) => (
-                <li key={i} className="flex items-start gap-1.5">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
-                  <textarea
-                    value={b}
-                    rows={2}
-                    onChange={(e) => setBullet(sectionKey as never, entryId, "bullets", i, e.target.value)}
-                    className="w-full resize-none rounded-lg border border-transparent bg-slate-50 px-2 py-1 text-[12px] leading-relaxed text-slate-600 outline-none transition-all focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
-                  />
-                </li>
-              ))}
-            </ul>
-            {/* 右下角：删除整块（隐性 → 悬停显性 + 动效） */}
-            <div className="mt-1.5 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={handleDelete}
-                title="删除这一块"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 opacity-0 transition-all duration-200 ease-out group-hover:opacity-60 hover:!scale-110 hover:!opacity-100 hover:bg-rose-50 hover:text-rose-500 active:scale-90"
-              >
-                <IconTrash className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
+          <ul className="mt-1 space-y-1.5 animate-[vault-fade-in_200ms_ease-out]">
+            {bulletList.map((b, i) => (
+              <li key={i} className="flex items-start gap-1.5">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                <textarea
+                  value={b}
+                  rows={2}
+                  onChange={(e) => setBullet(sectionKey as never, entryId, "bullets", i, e.target.value)}
+                  className="w-full resize-none rounded-lg border border-transparent bg-slate-50 px-2 py-1 text-[12px] leading-relaxed text-slate-600 outline-none transition-all focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                />
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
