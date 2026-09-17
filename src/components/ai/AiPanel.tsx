@@ -118,7 +118,15 @@ function useThinkingLine(thinking: boolean) {
 
 /* ---------- Prompt ---------- */
 
-const RULES = `【简历口径规范】
+const FACTS = `【事实红线 —— 最高优先级，违反即废稿】
+- 严禁编造用户没提供过的任何信息：数字（星数/用户量/百分比/营收）、奖项、排名、公司名、时间、成果
+- 改写 = 重组用户给出的原文素材，只能换说法，不能换事实
+- 素材里没有的数据：留出「——」占位并在 reason 里提示用户补充，绝不允许编一个
+- 不确定的信息一律不用：宁可平淡，绝不造假`;
+
+const RULES = `${FACTS}
+
+【简历口径规范】
 - 结论收尾：要点结尾用「——」接量化结果
 - 厉害但不晦涩：术语配人话，数字让外行秒懂
 - 成果导向：动词开头，不写"负责"`;
@@ -277,6 +285,7 @@ export function AiPanel() {
   const setBullet = useResumeStore((s) => s.setBullet);
   const sections = useResumeStore((s) => s.sections);
   const addExperience = useExperienceStore((s) => s.addItem);
+  const expItems = useExperienceStore((s) => s.items);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -342,6 +351,12 @@ export function AiPanel() {
 
     const isImprove = sortedSelections.length > 0;
     try {
+      /* 经历库素材：模型手里有真料才不会编造 */
+      const expBg = expItems
+        .slice(0, 12)
+        .map((it) => "- " + it.company + (it.project ? " · " + it.project : "") + "：" + it.summary)
+        .join("\n");
+
       let userContent: string;
       if (isImprove) {
         /* 多选：按文档顺序拼接所有选中的内容 */
@@ -357,9 +372,9 @@ export function AiPanel() {
             parts.push(`【模块：${sel.sectionLabel}（整块）】`);
           }
         }
-        userContent = `用户选中了以下简历内容：\n\n${parts.join("\n\n")}\n\n【用户反馈】${feedback}`;
+        userContent = `用户选中了以下简历内容：\n\n${parts.join("\n\n")}\n\n【用户反馈】${feedback}\n\n【经历库素材（改写时只能从这里取事实，没有的数据用「——」占位）】\n${expBg}`;
       } else {
-        userContent = feedback;
+        userContent = `【经历库素材】\n${expBg}\n\n【用户说】${feedback}`;
       }
 
       const { content: reply, reasoning } = await chatFull(
@@ -367,7 +382,7 @@ export function AiPanel() {
           { role: "system", content: isImprove ? SYSTEM_IMPROVE : SYSTEM_CHAT },
           { role: "user", content: userContent },
         ],
-        { temperature: isImprove ? 0.8 : 0.7 },
+        { temperature: isImprove ? 0.6 : 0.5 },
       );
 
       if (isImprove) {
