@@ -12,8 +12,9 @@
 
 import { useState } from "react";
 
-import { IconWarn } from "./icons";
-import { Btn } from "./ui";
+import { IconDownload, IconInfo } from "./icons";
+import { Button } from "./kit/Button";
+import { Dialog } from "./kit/Dialog";
 
 const DISMISS_KEY = "resume-ai/print-guide-dismissed";
 
@@ -25,10 +26,23 @@ export function isPrintGuideDismissed(): boolean {
   }
 }
 
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-solid text-[12px] font-semibold text-on-solid">
+        {n}
+      </span>
+      <div className="pt-0.5 text-[13.5px] leading-relaxed text-fg-2">{children}</div>
+    </li>
+  );
+}
+
 export function PrintGuideDialog({
+  open,
   onCancel,
   onProceed,
 }: {
+  open: boolean;
   onCancel: () => void;
   onProceed: () => void;
 }) {
@@ -46,62 +60,44 @@ export function PrintGuideDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-      onClick={onCancel}
-    >
-      <div
-        className="w-[460px] rounded-2xl bg-white p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-[15px] font-medium text-slate-800">导出前，请在打印窗口里改两个设置</h2>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-slate-500">
-          点「打开打印窗口」后，在打印预览的「更多设置」里：
-        </p>
+    <Dialog open={open} onClose={onCancel} width={460}>
+      <span className="surface curve mb-5 flex h-11 w-11 items-center justify-center text-fg-2" style={{ ["--r" as string]: "14px" }}>
+        <IconDownload className="h-5 w-5" />
+      </span>
+      <h2 className="text-[18px] font-semibold tracking-[-0.015em] text-fg">导出前，改两个打印设置</h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-fg-3">打开打印窗口后，在「更多设置」里：</p>
 
-        <ol className="mt-3 space-y-2.5">
-          <li className="flex gap-2.5">
-            <span className="tnum flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11.5px] font-medium text-brand">
-              1
-            </span>
-            <p className="text-[12.5px] leading-relaxed text-slate-700">
-              <span className="font-medium">边距</span>选「无」—— 页面已内置 14mm 页边距
-            </p>
-          </li>
-          <li className="flex gap-2.5">
-            <span className="tnum flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11.5px] font-medium text-brand">
-              2
-            </span>
-            <div className="text-[12.5px] leading-relaxed text-slate-700">
-              <span className="font-medium">取消勾选「页眉和页脚」</span>
-              <p className="mt-1 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11.5px] leading-relaxed text-amber-700">
-                <IconWarn className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                不取消的话，每页顶部会印上日期、底部会印上网址和页码 ——
-                就是那个去不掉的"水印"。浏览器没法替你关，只能在这里取消。
-              </p>
-            </div>
-          </li>
-        </ol>
+      <ol className="mt-5 space-y-4">
+        <Step n={1}>
+          <span className="font-semibold text-fg">边距</span> 选「无」—— 页面已内置 14mm 页边距
+        </Step>
+        <Step n={2}>
+          <span className="font-semibold text-fg">取消勾选「页眉和页脚」</span>
+          <p className="surface mt-2.5 flex items-start gap-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-fg-3" style={{ ["--r" as string]: "12px" }}>
+            <IconInfo className="mt-0.5 h-4 w-4 shrink-0" />
+            不取消的话，每页顶部会印上日期、底部印上网址和页码，就是那个去不掉的"水印"。浏览器只允许在这里关。
+          </p>
+        </Step>
+      </ol>
 
-        <label className="mt-4 flex cursor-pointer items-center gap-2 text-[12px] text-slate-600">
-          <input
-            type="checkbox"
-            checked={dismiss}
-            onChange={(e) => setDismiss(e.target.checked)}
-            className="h-3.5 w-3.5 accent-blue-600"
-          />
-          我记住了，下次不再提示
-        </label>
+      <label className="mt-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-fg-2">
+        <input
+          type="checkbox"
+          checked={dismiss}
+          onChange={(e) => setDismiss(e.target.checked)}
+          className="h-4 w-4 accent-[var(--fg)]"
+        />
+        我记住了，下次不再提示
+      </label>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <Btn variant="ghost" onClick={onCancel}>
-            取消
-          </Btn>
-          <Btn variant="primary" onClick={proceed}>
-            打开打印窗口
-          </Btn>
-        </div>
+      <div className="mt-6 flex justify-end gap-2">
+        <Button variant="ghost" size="md" onClick={onCancel}>
+          取消
+        </Button>
+        <Button variant="primary" size="md" onClick={proceed}>
+          打开打印窗口
+        </Button>
       </div>
-    </div>
+    </Dialog>
   );
 }

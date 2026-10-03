@@ -1,0 +1,202 @@
+/* ============================================================================
+ * 设计 token
+ *
+ * 两套色板：
+ *   - 界面色（--fg / --glass / --fill …）：黑白灰，随主题（浅 / 深）切换
+ *   - 纸张色（ink / line / brand）：简历成品用，永远是白纸黑字，不随主题变
+ *
+ * 想改界面配色只改下面 :root / [data-theme=dark] 两段；
+ * 想改简历字号/配色改 @theme 里的纸张段。
+ * ========================================================================== */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ------------------------------ 纸张（固定） ------------------------------ */
+
+@theme {
+  /* 拉丁走打包的 Inter，中文走打包的思源黑体，最后用系统字体兜底 */
+  --font-sans:
+    "Inter Variable", "Noto Sans SC Variable", "Hiragino Sans GB", "PingFang SC",
+    "Microsoft YaHei", "STHeiti", "Songti SC", system-ui, -apple-system, sans-serif;
+
+  --color-ink: #1f2937;
+  --color-ink-muted: #6b7280;
+  --color-ink-soft: #9ca3af;
+  --color-line: #e5e7eb;
+  --color-brand: #2563eb;
+  --color-brand-soft: #eff6ff;
+
+  /* 简历字号（pt，与打印物理尺寸一致）。一页版按「密排」调过：
+     正文 9.5pt / 行距 1.43，改大了一页版会装不下 */
+  --text-name: 18pt;
+  --text-name--line-height: 1.15;
+  --text-name--letter-spacing: 0.02em;
+
+  --text-heading: 10pt;
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: 0.08em;
+
+  --text-body: 9.5pt;
+  --text-body--line-height: 1.43;
+
+  --text-small: 8.5pt;
+  --text-small--line-height: 1.42;
+
+  --text-micro: 7.5pt;
+  --text-micro--line-height: 1.3;
+}
+
+/* ------------------------------ 界面（随主题） ------------------------------ */
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+  --color-hairline: var(--hairline);
+  --color-hairline-2: var(--hairline-2);
+  --color-fill: var(--fill);
+  --color-fill-2: var(--fill-2);
+  --color-fill-3: var(--fill-3);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-solid: var(--solid);
+  --color-on-solid: var(--on-solid);
+  --color-danger: var(--danger);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+:root {
+  color-scheme: light;
+
+  --canvas: #e6e6e8;
+  --canvas-light: rgb(255 255 255 / 0.92);
+  --canvas-light-2: rgb(255 255 255 / 0.5);
+  --canvas-shade: rgb(0 0 0 / 0.08);
+  --canvas-shade-2: rgb(0 0 0 / 0.11);
+
+  --fg: #0b0b0c;
+  --fg-2: #38383d;
+  --fg-3: #6c6c73;
+  --fg-4: #a2a2a9;
+
+  --hairline: rgb(0 0 0 / 0.07);
+  --hairline-2: rgb(0 0 0 / 0.13);
+
+  --fill: rgb(0 0 0 / 0.035);
+  --fill-2: rgb(0 0 0 / 0.06);
+  --fill-3: rgb(0 0 0 / 0.1);
+
+  /* 内层卡片（不带模糊，叠在玻璃上） */
+  --card: rgb(255 255 255 / 0.62);
+  --card-2: rgb(255 255 255 / 0.9);
+  --card-shadow: 0 1px 1px rgb(0 0 0 / 0.025), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+
+  /* 玻璃 */
+  --glass-top: rgb(255 255 255 / 0.74);
+  --glass-bottom: rgb(255 255 255 / 0.52);
+  --glass-rim-top: rgb(255 255 255 / 1);
+  --glass-rim-bottom: rgb(255 255 255 / 0.3);
+  --glass-edge: rgb(0 0 0 / 0.06);
+  --glass-sheen: rgb(255 255 255 / 0.55);
+  --glass-shadow:
+    0 1px 1px rgb(0 0 0 / 0.03),
+    0 10px 28px -10px rgb(0 0 0 / 0.14),
+    0 34px 70px -28px rgb(0 0 0 / 0.16);
+  --glass-blur: 26px;
+
+  /* 实心按钮 = 墨 */
+  --solid: #0b0b0c;
+  --on-solid: #fafafa;
+  --solid-hover: #2a2a2e;
+  --solid-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 1px 2px rgb(0 0 0 / 0.22),
+    0 6px 16px -6px rgb(0 0 0 / 0.35);
+
+  --danger: #b4231a;
+
+  /* 纸张在画布上的投影 */
+  --paper-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 2px 4px rgb(0 0 0 / 0.04),
+    0 24px 48px -16px rgb(0 0 0 / 0.18),
+    0 60px 120px -40px rgb(0 0 0 / 0.2);
+
+  /* 选区（简历上可点的段落） */
+  --mark-line: rgb(0 0 0 / 0.55);
+  --mark-wash: rgb(0 0 0 / 0.045);
+  --mark-wash-strong: rgb(0 0 0 / 0.07);
+
+  /* 圆角：曲面感来自大圆角 + 超椭圆（支持的浏览器） */
+  --r-panel: 26px;
+  --r-card: 18px;
+  --r-ctl: 12px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0c0c0e;
+  --canvas-light: rgb(255 255 255 / 0.075);
+  --canvas-light-2: rgb(255 255 255 / 0.035);
+  --canvas-shade: rgb(0 0 0 / 0.5);
+  --canvas-shade-2: rgb(255 255 255 / 0.045);
+
+  --fg: #f3f3f5;
+  --fg-2: #c9c9ce;
+  --fg-3: #8d8d95;
+  --fg-4: #5c5c63;
+
+  --hairline: rgb(255 255 255 / 0.075);
+  --hairline-2: rgb(255 255 255 / 0.14);
+
+  --fill: rgb(255 255 255 / 0.04);
+  --fill-2: rgb(255 255 255 / 0.07);
+  --fill-3: rgb(255 255 255 / 0.12);
+
+  --card: rgb(255 255 255 / 0.035);
+  --card-2: rgb(255 255 255 / 0.07);
+  --card-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 2px 8px -2px rgb(0 0 0 / 0.4);
+
+  --glass-top: rgb(38 38 42 / 0.62);
+  --glass-bottom: rgb(24 24 27 / 0.5);
+  --glass-rim-top: rgb(255 255 255 / 0.2);
+  --glass-rim-bottom: rgb(255 255 255 / 0.03);
+  --glass-edge: rgb(255 255 255 / 0.05);
+  --glass-sheen: rgb(255 255 255 / 0.06);
+  --glass-shadow:
+    0 1px 1px rgb(0 0 0 / 0.4),
+    0 14px 34px -10px rgb(0 0 0 / 0.55),
+    0 40px 90px -30px rgb(0 0 0 / 0.7);
+
+  --solid: #f3f3f5;
+  --on-solid: #0b0b0c;
+  --solid-hover: #ffffff;
+  --solid-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 6px 18px -6px rgb(255 255 255 / 0.18);
+
+  --danger: #ff7a6e;
+
+  --paper-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 2px 6px rgb(0 0 0 / 0.4),
+    0 30px 60px -20px rgb(0 0 0 / 0.7),
+    0 80px 140px -40px rgb(0 0 0 / 0.8);
+
+  /* 纸张永远是白的，所以选区色在深色主题下不变 */
+}
+
+/* 超椭圆圆角：同样的曲率在 squircle 下视觉更小，所以半径放大 */
+@supports (corner-shape: squircle) {
+  :root {
+    --r-panel: 44px;
+    --r-card: 30px;
+    --r-ctl: 18px;
+  }
+}

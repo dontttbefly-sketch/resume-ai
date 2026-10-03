@@ -1,0 +1,101 @@
+/* ============================================================================
+ * 打印 / 导出 PDF
+ *
+ * 关键点，缺一个就出问题：
+ *   1. 页边距交给 @page margin。做在纸张 padding 上时，内容一旦超过一页，
+ *      只有第 1 页顶部和最后一页底部有边距，中间那些页会顶到纸边。
+ *   2. 界面外壳用 display:none 摘掉，不是 visibility:hidden ——
+ *      不可见元素仍然占版面，会凭空多出空白页。
+ *   3. 从 body 到纸张这条链路全部改成普通块流，取消 fixed / 缩放 / 滚动容器。
+ *   4. 强制打印背景色，否则模块标题的下划线会消失。
+ * ========================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print,
+  .app-canvas {
+    display: none !important;
+  }
+
+  /* 纸张所在的这条链路：还原成普通块流 */
+  .app-shell,
+  .app-view,
+  .studio-canvas,
+  .paper-pad,
+  .paper-stage,
+  .paper-scale {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    animation: none !important;
+    background: #fff !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    filter: none !important;
+  }
+
+  .resume-paper {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  /* 交互层全部摘掉 */
+  .resume-paper *::before,
+  .resume-paper *::after {
+    display: none !important;
+  }
+  .block-thinking {
+    filter: none !important;
+    opacity: 1 !important;
+  }
+
+  /* 一条要点不要被切成两页。
+     注意：不要给整段经历加 break-inside:avoid —— 那段内容一旦超过一页，
+     浏览器会把它整体推到下一页，上一页底部就会空掉一大片。 */
+  .resume-paper li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 模块标题、以及条目头（公司名 + 日期那一行）不要单独留在页底 */
+  .resume-paper section > h2,
+  .resume-paper .entry-head {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

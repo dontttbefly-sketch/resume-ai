@@ -1,0 +1,308 @@
+/* ============================================================================
+ * 动效
+ *
+ * 原则：只动 transform / opacity（合成层完成，不触发布局重排）；
+ * 时长 160–560ms；弹簧曲线只带 1% 的过冲，读起来是「稳」而不是「弹」。
+ * 系统开了「减少动态效果」就全部降级为瞬时切换。
+ * ========================================================================== */
+
+:root {
+  /* 阻尼 0.82 的弹簧，1% 过冲，约 560ms 落定 */
+  --spring: linear(0, 0.0182, 0.0653, 0.1314, 0.2089, 0.292, 0.3761, 0.4581, 0.5357, 0.6075, 0.6726, 0.7307, 0.7817, 0.8259, 0.8637, 0.8955, 0.922, 0.9437, 0.9612, 0.9752, 0.986, 0.9943, 1.0005, 1.0049, 1.0079, 1.0097, 1.0107, 1.0111, 1.011, 1.0105, 1.0098, 1.0089, 1.008, 1.0071, 1.0062, 1.0053, 1.0045, 1.0038, 1.0031, 1.0025, 1);
+  --spring-dur: 560ms;
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ------------------------------ 进出场 ------------------------------ */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-out-right {
+  to {
+    opacity: 0;
+    transform: translateX(24px) scale(0.99);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.anim-rise {
+  animation: rise-in var(--spring-dur) var(--spring) both;
+}
+.anim-fade {
+  animation: fade-in 280ms var(--ease-out-quint) both;
+}
+.anim-pop[data-state="open"] {
+  animation: pop-in 220ms var(--ease-out-quint) both;
+}
+.anim-pop[data-state="closed"] {
+  animation: pop-out 140ms ease-in both;
+}
+.anim-dialog[data-state="open"] {
+  animation: dialog-in 420ms var(--spring) both;
+}
+.anim-dialog[data-state="closed"] {
+  animation: pop-out 160ms ease-in both;
+}
+.anim-overlay[data-state="open"] {
+  animation: fade-in 240ms ease-out both;
+}
+.anim-overlay[data-state="closed"] {
+  animation: fade-out 160ms ease-in both;
+}
+.anim-panel[data-state="open"] {
+  animation: slide-in-right var(--spring-dur) var(--spring) both;
+}
+.anim-panel[data-state="closed"] {
+  animation: slide-out-right 200ms ease-in both;
+}
+
+/* 错峰进场：给子元素 style="--i: n" */
+.stagger > * {
+  animation: rise-in var(--spring-dur) var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* 高度展开：grid 0fr → 1fr，内容不用测量高度 */
+.disclose {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 380ms var(--ease-out-quint);
+}
+.disclose[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.disclose > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 按压反馈 */
+.press {
+  transition:
+    transform 160ms var(--ease-out-quint),
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 200ms ease,
+    opacity 160ms ease;
+}
+.press:active:not(:disabled) {
+  transform: scale(0.965);
+}
+
+/* 悬浮微抬 */
+.lift {
+  transition:
+    transform 320ms var(--ease-out-quint),
+    box-shadow 320ms var(--ease-out-quint),
+    background-color 200ms ease;
+}
+.lift:hover {
+  transform: translateY(-1px);
+}
+
+/* ------------------------------ 加载 / 思考 ------------------------------ */
+
+/* 文字上扫过的一道光：思考中、生成中 */
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+.shimmer-text {
+  color: transparent;
+  background: linear-gradient(
+      100deg,
+      var(--fg-3) 0%,
+      var(--fg-3) 38%,
+      var(--fg) 50%,
+      var(--fg-3) 62%,
+      var(--fg-3) 100%
+    )
+    0 0 / 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* 呼吸点 */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.breathe {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* 在线状态点的脉冲环 */
+@keyframes ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  80%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.ping {
+  animation: ping 1.8s var(--ease-out-quint) infinite;
+}
+
+/* ------------------------------ 视图切换（View Transitions） ------------------------------ */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: var(--ease-out-quint);
+}
+
+::view-transition-old(view),
+::view-transition-new(view) {
+  animation-duration: 360ms;
+  animation-timing-function: var(--ease-out-quint);
+}
+::view-transition-old(view) {
+  animation-name: vt-out;
+}
+::view-transition-new(view) {
+  animation-name: vt-in;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: scale(0.992);
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.996);
+  }
+}
+
+/* 主题切换：从按钮位置圆形展开 */
+.theme-vt::view-transition-old(root) {
+  animation: none;
+}
+.theme-vt::view-transition-new(root) {
+  animation: theme-reveal 560ms var(--ease-in-out);
+}
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--vt-x, 100%) var(--vt-y, 0));
+  }
+  to {
+    clip-path: circle(var(--vt-r, 150vmax) at var(--vt-x, 100%) var(--vt-y, 0));
+  }
+}
+
+/* ------------------------------ 降级 ------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

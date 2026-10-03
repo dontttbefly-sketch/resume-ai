@@ -28,7 +28,6 @@ interface SelectionState {
   selections: Selection[];
   panelOpen: boolean;
   thinking: boolean;
-  vaultOpen: boolean;
 
   /** 点选一个块：已选则移除，未选则添加；同时打开面板 */
   toggle: (s: Selection) => void;
@@ -41,14 +40,12 @@ interface SelectionState {
   /** 关闭面板 + 清空选区 */
   close: () => void;
   setThinking: (v: boolean) => void;
-  setVaultOpen: (v: boolean) => void;
 }
 
 export const useSelectionStore = create<SelectionState>()((set) => ({
   selections: [],
   panelOpen: false,
   thinking: false,
-  vaultOpen: false,
 
   toggle: (s) =>
     set((st) => {
@@ -80,7 +77,6 @@ export const useSelectionStore = create<SelectionState>()((set) => ({
   open: () => set({ panelOpen: true }),
   close: () => set({ selections: [], panelOpen: false }),
   setThinking: (v) => set({ thinking: v }),
-  setVaultOpen: (v) => set({ vaultOpen: v }),
 }));
 
 /** 生成稳定 key */

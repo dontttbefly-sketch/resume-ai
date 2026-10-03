@@ -21,7 +21,8 @@ export interface ExperienceItem {
 
 interface ExperienceState {
   items: ExperienceItem[];
-  addItem: (item: Omit<ExperienceItem, "id" | "updatedAt">) => void;
+  addItem: (item: Omit<ExperienceItem, "id" | "updatedAt">) => string;
+  updateItem: (id: string, patch: Partial<Omit<ExperienceItem, "id" | "updatedAt">>) => void;
   removeItem: (id: string) => void;
 }
 
@@ -29,12 +30,14 @@ export const useExperienceStore = create<ExperienceState>()(
   persist(
     (set) => ({
       items: [],
-      addItem: (item) =>
+      addItem: (item) => {
+        const id = crypto.randomUUID();
+        set((state) => ({ items: [...state.items, { ...item, id, updatedAt: Date.now() }] }));
+        return id;
+      },
+      updateItem: (id, patch) =>
         set((state) => ({
-          items: [
-            ...state.items,
-            { ...item, id: crypto.randomUUID(), updatedAt: Date.now() },
-          ],
+          items: state.items.map((i) => (i.id === id ? { ...i, ...patch, updatedAt: Date.now() } : i)),
         })),
       removeItem: (id) =>
         set((state) => ({ items: state.items.filter((i) => i.id !== id) })),

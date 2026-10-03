@@ -19,3 +19,12 @@ public/private/
 一页版导出示例.pdf
 完整版导出示例.pdf
 docs/
+.vercel
+.env*
+
+# BOSS 投递技能：上游是独立仓库，目录里有投递记录、判岗画像等个人数据
+boss-zhipin-assistant/
+boss-zhipin-assistant-egolite/
+
+# 根目录的 PDF 都是真实简历导出
+/*.pdf

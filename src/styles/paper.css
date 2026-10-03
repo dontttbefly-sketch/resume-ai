@@ -1,0 +1,155 @@
+/* ============================================================================
+ * A4 纸张 + 纸面上的交互层
+ *
+ * 纸张尺寸/边距/字号与导出 PDF 一一对应，改这里会影响一页版能否装下。
+ * ========================================================================== */
+
+.resume-paper {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 14mm;
+  box-sizing: border-box;
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* 纸面不吃界面的 Inter 风格集，保持和导出 PDF 一致 */
+  font-feature-settings: normal;
+  font-size: 9.5pt;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+  box-shadow: var(--paper-shadow);
+}
+
+/* 强调色：经典蓝（默认）/ 墨黑。只换颜色，不动排版 */
+.resume-paper[data-accent="ink"] {
+  --color-brand: #111113;
+  --color-brand-soft: #f2f2f3;
+}
+
+/* 单页安全线（只在屏幕上显示） */
+.paper-safe-line {
+  position: absolute;
+  left: 14mm;
+  right: 14mm;
+  top: 283mm;
+  height: 0;
+  border-top: 1px dashed rgb(0 0 0 / 0.18);
+  pointer-events: none;
+}
+.paper-safe-line::after {
+  content: "单页边界";
+  position: absolute;
+  right: 0;
+  top: 3px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgb(0 0 0 / 0.28);
+}
+
+/* ---------- 可点区域：左侧标记线 + 底色晕染（平躺，不浮起） ----------
+   层级编码：标记线粗细 —— 要点 2px / 条目 3px / 模块 4px
+   悬停 = 预览（淡）；选中 = 定格（实） */
+
+.resume-paper [data-bullet-index],
+.resume-paper [data-entry-id],
+.resume-paper [data-section-key] {
+  position: relative;
+  border-radius: 8px;
+}
+
+.resume-paper [data-bullet-index]::before,
+.resume-paper [data-entry-id]::before,
+.resume-paper [data-section-key]::before {
+  content: "";
+  position: absolute;
+  inset: -2px -6px;
+  border-radius: 9px;
+  background: linear-gradient(to right, var(--mark-wash-strong), var(--mark-wash) 40%, transparent 85%);
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 0.22);
+  opacity: 0;
+  transition: opacity 260ms var(--ease-out-quint);
+  pointer-events: none;
+}
+
+.resume-paper [data-bullet-index]:hover::before,
+.resume-paper [data-entry-id]:hover:not(:has([data-bullet-index]:hover))::before,
+.resume-paper [data-section-key]:hover:not(:has([data-entry-id]:hover))::before,
+.resume-paper .is-linked::before {
+  opacity: 1;
+}
+
+.resume-paper .block-selected::before {
+  opacity: 1 !important;
+  background: linear-gradient(to right, rgb(0 0 0 / 0.085), rgb(0 0 0 / 0.04) 45%, transparent 90%) !important;
+  box-shadow: inset 2px 0 0 var(--mark-line) !important;
+}
+.resume-paper .block-selected[data-level="entry"]::before {
+  box-shadow: inset 3px 0 0 var(--mark-line) !important;
+}
+.resume-paper .block-selected[data-level="section"]::before {
+  box-shadow: inset 4px 0 0 var(--mark-line) !important;
+}
+
+/* 取消选中后，鼠标离开前不再显示悬停态（防同位置悬停抢视觉） */
+.resume-paper [data-entry-id].hover-frozen::before,
+.resume-paper [data-section-key].hover-frozen::before,
+.resume-paper .hover-frozen [data-bullet-index]::before {
+  opacity: 0 !important;
+}
+
+/* ---------- AI 思考中：选区虚化 ---------- */
+.block-thinking {
+  filter: blur(2px);
+  opacity: 0.55;
+  transition:
+    filter 420ms var(--ease-out-quint),
+    opacity 420ms var(--ease-out-quint);
+}
+
+/* ---------- 应用成功：一道墨色晕染从左向右扫过后褪去 ---------- */
+@keyframes applied-sweep {
+  0% {
+    background-position: 100% 0;
+    opacity: 1;
+  }
+  60% {
+    background-position: 0 0;
+    opacity: 1;
+  }
+  100% {
+    background-position: 0 0;
+    opacity: 0;
+  }
+}
+.block-applied::after {
+  content: "";
+  position: absolute;
+  inset: -2px -6px;
+  border-radius: 9px;
+  background: linear-gradient(90deg, rgb(0 0 0 / 0.1) 0%, rgb(0 0 0 / 0.1) 45%, transparent 55%) 0 0 / 220% 100%;
+  animation: applied-sweep 1.3s var(--ease-out-quint) forwards;
+  pointer-events: none;
+}
+
+/* ---------- 选中块内的指针涟漪 ---------- */
+.select-ripple {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(0 0 0 / 0.16), rgb(0 0 0 / 0));
+  pointer-events: none;
+  animation: ripple-out 700ms var(--ease-out-quint) forwards;
+}
+@keyframes ripple-out {
+  from {
+    transform: scale(0.5);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}

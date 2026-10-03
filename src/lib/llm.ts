@@ -203,6 +203,13 @@ async function doChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<
       }
       throw new LlmError("auth", "API key 无效或没有权限", detail);
     }
+    if (res.status === 402) {
+      throw new LlmError(
+        "auth",
+        "模型账户余额不足",
+        "模型服务返回 402（insufficient balance）：去 MiniMax 控制台充值，或在 .env.local 换一个兼容 OpenAI 接口的模型。",
+      );
+    }
     if (res.status === 429) {
       throw new LlmError("rate-limit", "调用太频繁或额度用完了", detail);
     }

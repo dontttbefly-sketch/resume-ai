@@ -1,0 +1,121 @@
+/* ============================================================================
+ * 材质：玻璃 / 卡片 / 实心
+ *
+ * 玻璃 = 背景模糊 + 上亮下暗的渐变填充 + 一圈「边缘高光」(rim light)
+ *        + 顶部一抹弧形反光(sheen)。边缘高光和反光让平面读起来像微微
+ *        隆起的曲面，这是「曲面感」的来源。
+ *
+ * 性能约定：backdrop-filter 只用在常驻的几块大面板上（顶栏、侧栏、
+ * AI 面板、底部浮条、弹窗）。列表里的卡片一律用 .surface（无模糊）。
+ * ========================================================================== */
+
+.glass,
+.surface,
+.curve {
+  border-radius: var(--r, var(--r-panel));
+}
+
+@supports (corner-shape: squircle) {
+  .glass,
+  .surface,
+  .curve,
+  .glass::before,
+  .glass::after,
+  .surface::before {
+    corner-shape: squircle;
+  }
+}
+
+.glass {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.7);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.7);
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 0 0 1px var(--glass-edge);
+}
+
+/* 边缘高光：1px 渐变描边，上沿最亮，向下迅速消隐 */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    var(--glass-rim-top),
+    var(--glass-rim-bottom) 22%,
+    transparent 55%,
+    var(--glass-rim-bottom) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* 顶部弧形反光 */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(130% 70% at 50% -18%, var(--glass-sheen), transparent 58%);
+  pointer-events: none;
+}
+
+/* 跟随指针的高光（只挂在少数几个主卡片上，pointermove 里写 --mx / --my） */
+.glass.spot::after {
+  background:
+    radial-gradient(360px circle at var(--mx, 50%) var(--my, -40%), var(--glass-sheen), transparent 70%),
+    radial-gradient(130% 70% at 50% -18%, var(--glass-sheen), transparent 58%);
+}
+
+/* 内层卡片：不模糊，只有半透明填充 + 发丝描边 */
+.surface {
+  position: relative;
+  background: var(--card);
+  box-shadow:
+    var(--card-shadow),
+    inset 0 0 0 1px var(--hairline);
+}
+
+.surface-strong {
+  background: var(--card-2);
+}
+
+/* 凹槽：输入框、分段控件的底 */
+.well {
+  background: var(--fill);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.04), inset 0 0 0 1px var(--hairline);
+}
+[data-theme="dark"] .well {
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3), inset 0 0 0 1px var(--hairline);
+}
+
+/* 实心（墨）按钮/胶囊 */
+.solid {
+  background: var(--solid);
+  color: var(--on-solid);
+  box-shadow: var(--solid-shadow);
+}
+.solid:hover:not(:disabled) {
+  background: var(--solid-hover);
+}
+
+/* 发丝分隔线 */
+.hair-b {
+  box-shadow: inset 0 -1px 0 var(--hairline);
+}
+.hair-t {
+  box-shadow: inset 0 1px 0 var(--hairline);
+}
