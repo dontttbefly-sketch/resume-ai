@@ -85,7 +85,7 @@ const SECTION_DEFS = [
           control: "text",
           role: "meta",
           colSpan: 1,
-          placeholder: "github.com/dontttbefly-sketch",
+          placeholder: "github.com/yourname",
         },
         {
           key: "portfolio",
@@ -149,7 +149,7 @@ const SECTION_DEFS = [
           control: "bullets",
           role: "bullets",
           colSpan: 2,
-          placeholder: "做过完整的从 0 到 1 的 AI native 项目落地交付",
+          placeholder: "做过完整的从 0 到 1 的项目落地交付",
           hint: "回车新增一条；留空回车删除本条。",
         },
       ],
@@ -174,7 +174,7 @@ const SECTION_DEFS = [
           role: "primary",
           colSpan: 2,
           required: true,
-          placeholder: "深圳市蓝禾技术有限公司",
+          placeholder: "某某科技有限公司",
         },
         {
           key: "title",
@@ -215,7 +215,7 @@ const SECTION_DEFS = [
           control: "textarea",
           role: "body",
           colSpan: 2,
-          placeholder: "在天猫图拉斯主导过多个 AI 结合业务的降本增效项目",
+          placeholder: "一句话说明这段经历的范围和重点",
         },
         {
           key: "bullets",
@@ -248,7 +248,7 @@ const SECTION_DEFS = [
           role: "primary",
           colSpan: 2,
           required: true,
-          placeholder: "小红书电商",
+          placeholder: "项目名称",
         },
         {
           key: "role",
@@ -256,7 +256,7 @@ const SECTION_DEFS = [
           control: "text",
           role: "secondary",
           colSpan: 1,
-          placeholder: "总负责人",
+          placeholder: "负责人",
         },
         {
           key: "stack",
@@ -264,7 +264,7 @@ const SECTION_DEFS = [
           control: "tags",
           role: "meta",
           colSpan: 1,
-          placeholder: "竞品分析, 数据分析, 团队管理",
+          placeholder: "竞品分析, 数据分析",
           hint: "用逗号分隔，预览时显示成小标签。",
         },
         {
@@ -289,7 +289,7 @@ const SECTION_DEFS = [
           control: "bullets",
           role: "bullets",
           colSpan: 2,
-          placeholder: "负责…，浏览量最高 20000+",
+          placeholder: "负责…，结果量化（如浏览量 2 万+）",
         },
       ],
     },
@@ -313,7 +313,7 @@ const SECTION_DEFS = [
           role: "primary",
           colSpan: 2,
           required: true,
-          placeholder: "广州大学",
+          placeholder: "某某大学",
         },
         {
           key: "degree",
@@ -329,7 +329,7 @@ const SECTION_DEFS = [
           control: "text",
           role: "secondary",
           colSpan: 1,
-          placeholder: "给水排水工程",
+          placeholder: "专业名称",
         },
         {
           key: "start",
@@ -385,7 +385,7 @@ const SECTION_DEFS = [
           control: "textarea",
           role: "body",
           colSpan: 2,
-          placeholder: "英语专业四级 / 驾驶证 C1 / 计算机二级",
+          placeholder: "英语四级 / 计算机二级",
         },
       ],
     },

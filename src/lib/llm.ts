@@ -1,18 +1,24 @@
 /* ============================================================================
  * 模型调用通道
  *
- * 两种部署形态，同一个接口：
+ * 三种部署形态，同一个接口：
  *   - 本地开发：打到同源 /api/llm，由 Vite 开发服务器转发并注入 Authorization
- *   - 线上部署（GitHub Pages 等纯静态托管）：直接调部署好的 Worker
- *     （见 worker/），Worker 保管 API key 并校验邀请码
+ *   - 线上账号版（Vercel）：VITE_LLM_PROXY_URL=/api/llm，同源，按登录账号扣
+ *     AI 额度（见 api/llm.ts），扣完的余额随响应头 X-Ai-Quota 带回
+ *   - GitHub Pages 演示版：直接调部署好的 Worker（见 worker/），
+ *     Worker 保管 API key 并校验邀请码
  *
- * 邀请码存在 localStorage，随请求头 X-Invite-Code 发送；Worker 返回 401 时
- * 前端弹输入框让用户填写。API key 永远不进前端构建产物。
+ * 邀请码 / 个人密钥存在 localStorage，随请求头 X-Invite-Code 发送；Worker 返回
+ * 401 时前端弹输入框让用户填写。API key 永远不进前端构建产物。
  * ========================================================================== */
+
+import { setQuota } from "./account";
 
 export type LlmErrorKind =
   | "no-key"
   | "needs-invite"
+  | "session"
+  | "no-quota"
   | "auth"
   | "rate-limit"
   | "timeout"
@@ -189,10 +195,31 @@ async function doChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     let detail = text.slice(0, 400);
+    let parsed: unknown = null;
     try {
-      detail = readApiError(JSON.parse(text)) || detail;
+      parsed = JSON.parse(text);
+      detail = readApiError(parsed) || detail;
     } catch {
       /* 不是 JSON，保留原始文本 */
+    }
+
+    // 线上账号版（api/llm.ts）的报错自带 code 和给人看的 message
+    const own = (parsed as { error?: { code?: string; message?: string; detail?: string } } | null)?.error;
+    if (own?.code && own.message) {
+      const extra = own.detail ?? "";
+      switch (own.code) {
+        case "auth":
+          throw new LlmError("session", "登录已失效", "刷新页面重新登录一次。");
+        case "quota":
+          setQuota(0);
+          throw new LlmError("no-quota", "AI 额度用完了", "找站长加额度；或者在右上角头像菜单「AI 额度」里填自己的模型密钥，就不扣额度了。");
+        case "byok":
+          throw new LlmError("auth", own.message, `${extra ? `${extra}。` : ""}去右上角头像菜单「AI 额度」检查你的模型密钥，或改回用站长的。`);
+        case "rate-limit":
+          throw new LlmError("rate-limit", own.message, extra);
+        default:
+          throw new LlmError(res.status >= 500 ? "server" : "unknown", own.message, extra);
+      }
     }
 
     if (res.status === 401 || res.status === 403) {
@@ -218,6 +245,9 @@ async function doChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<
     }
     throw new LlmError("unknown", `请求失败（HTTP ${res.status}）`, detail);
   }
+
+  const left = res.headers.get("X-Ai-Quota");
+  if (left !== null) setQuota(Number(left));
 
   const data: unknown = await res.json().catch(() => null);
   const content = extractContent(data);

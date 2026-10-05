@@ -5,7 +5,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-export type AppView = "studio" | "match" | "deliver" | "library";
+/** admin = 用户管理，只有线上版的站长看得到 */
+export type AppView = "studio" | "match" | "deliver" | "library" | "admin";
 export type ThemePref = "system" | "light" | "dark";
 export type PaperAccent = "blue" | "ink";
 /** "fit" = 按可用宽度自适应；数字 = 固定缩放比例 */

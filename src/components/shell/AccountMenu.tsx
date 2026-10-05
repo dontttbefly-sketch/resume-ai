@@ -1,18 +1,33 @@
 /* ============================================================================
- * 头像菜单：完成度 / 版本载入 / 外观 / 账号 / 危险区
+ * 头像菜单：完成度 / 线上账号（AI 额度）/ 版本载入 / 外观 / 云同步 / 危险区
  * 不常用但需要随手够得到的东西都收在这里
  * ========================================================================== */
 
 import { useMemo, useRef, useState } from "react";
 
 import { buildAiDevResume } from "../../data/privateResume";
+import { fmtTokens, logout, useAccount } from "../../lib/account";
+import { useOwnerData } from "../../lib/ownerData";
 import { checkCompletion, asString } from "../../lib/resume";
-import { setThemeAnimated } from "../../lib/transitions";
+import { setThemeAnimated, switchView } from "../../lib/transitions";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useResumeStore } from "../../store/useResumeStore";
 import { useUiStore, type PaperAccent, type ThemePref } from "../../store/useUiStore";
+import { AiQuotaDialog, PasswordDialog } from "../account/AccountDialogs";
 import { AuthDialog } from "../Auth";
-import { IconCloud, IconDoc, IconLayers, IconLogout, IconMonitor, IconMoon, IconSun, IconTrash } from "../icons";
+import {
+  IconChevronRight,
+  IconCloud,
+  IconDoc,
+  IconKey,
+  IconLayers,
+  IconLogout,
+  IconMonitor,
+  IconMoon,
+  IconSun,
+  IconTrash,
+  IconUser,
+} from "../icons";
 import { confirmDialog } from "../kit/Dialog";
 import { Ring } from "../kit/misc";
 import { MenuItem, MenuLabel, MenuSep, Popover } from "../kit/Popover";
@@ -22,6 +37,9 @@ import { toast } from "../kit/Toast";
 export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [quotaOpen, setQuotaOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const me = useAccount((s) => s.me);
   const anchor = useRef<HTMLButtonElement>(null);
 
   const sections = useResumeStore((s) => s.sections);
@@ -31,7 +49,8 @@ export function AccountMenu() {
   const loadAiDev = useResumeStore((s) => s.loadAiDev);
   const loadSample = useResumeStore((s) => s.loadSample);
   const clearAll = useResumeStore((s) => s.clearAll);
-  const hasAiDev = useMemo(() => buildAiDevResume() != null, []);
+  const ownerReady = useOwnerData((s) => s.ready);
+  const hasAiDev = useMemo(() => buildAiDevResume() != null, [ownerReady]);
 
   const theme = useUiStore((s) => s.theme);
   const accent = useUiStore((s) => s.paperAccent);
@@ -92,6 +111,55 @@ export function AccountMenu() {
           </div>
         </div>
 
+        {me && (
+          <>
+            <MenuSep />
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setQuotaOpen(true);
+              }}
+              className="press flex w-full items-center gap-3 rounded-[12px] px-2.5 py-2 text-left hover:bg-fill-2"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-fg">
+                  {me.nick || me.email}
+                  <span className="ml-1.5 font-normal text-fg-4">{me.email}</span>
+                </p>
+                <p className={`mt-0.5 text-[11.5px] ${!me.ownLlm && me.role !== "owner" && me.quota <= 0 ? "text-danger" : "text-fg-3"}`}>
+                  {me.ownLlm
+                    ? "用自己的模型 · 不扣额度"
+                    : me.role === "owner"
+                      ? "站长 · AI 不限额度"
+                      : `AI 额度还剩 ${fmtTokens(me.quota)} token`}
+                </p>
+              </div>
+              <IconChevronRight className="h-4 w-4 shrink-0 text-fg-4" />
+            </button>
+            {me.role === "owner" && (
+              <MenuItem
+                icon={<IconUser className="h-4 w-4" />}
+                onClick={() => {
+                  setOpen(false);
+                  switchView("admin");
+                }}
+              >
+                用户管理
+              </MenuItem>
+            )}
+            <MenuItem
+              icon={<IconKey className="h-4 w-4" />}
+              onClick={() => {
+                setOpen(false);
+                setPwOpen(true);
+              }}
+            >
+              修改密码
+            </MenuItem>
+          </>
+        )}
+
         <MenuSep />
         <MenuLabel>版本</MenuLabel>
         <MenuItem icon={<IconDoc className="h-4 w-4" />} onClick={() => void load("一页版", loadMine)}>
@@ -151,7 +219,7 @@ export function AccountMenu() {
             }}
             trailing={<span className="max-w-[120px] truncate text-[11px] text-fg-4">{email}</span>}
           >
-            退出登录
+            退出云同步
           </MenuItem>
         ) : status === "signed-out" ? (
           <MenuItem
@@ -165,6 +233,12 @@ export function AccountMenu() {
             登录并云同步
           </MenuItem>
         ) : null}
+
+        {me && (
+          <MenuItem icon={<IconLogout className="h-4 w-4" />} onClick={logout}>
+            退出账号
+          </MenuItem>
+        )}
 
         <MenuItem
           icon={<IconTrash className="h-4 w-4" />}
@@ -185,6 +259,8 @@ export function AccountMenu() {
       </Popover>
 
       <AuthDialog open={authOpen} onClose={() => setAuthOpen(false)} />
+      <AiQuotaDialog open={quotaOpen} onClose={() => setQuotaOpen(false)} />
+      <PasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} />
     </>
   );
 }

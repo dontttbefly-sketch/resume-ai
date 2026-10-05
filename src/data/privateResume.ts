@@ -42,19 +42,43 @@ function pick(key: "buildMyResume" | "buildFullResume" | "buildAiDevResume"): Re
   return key === "buildMyResume" ? buildSampleResume() : buildEmptyResume();
 }
 
+/* ------------------------------------------------------------------------
+ * 站长专属数据（线上）
+ *
+ * 线上是公开版构建，上面的 glob 是空的；站长登录后，lib/ownerData.ts 会从门禁
+ * 后面的 /owner/resume.json 取回自己的简历塞到这里，优先于示例数据。
+ * ---------------------------------------------------------------------- */
+
+export interface OwnerResumes {
+  mine?: Resume | null;
+  full?: Resume | null;
+  aiDev?: Resume | null;
+}
+
+let owner: OwnerResumes | null = null;
+
+export function setOwnerResumes(data: OwnerResumes): void {
+  owner = data;
+}
+
+/** 每次载入都给一份新拷贝，免得多个档案共用同一个对象 */
+function fromOwner(r: Resume | null | undefined): Resume | null {
+  return r ? { ...structuredClone(r), updatedAt: Date.now() } : null;
+}
+
 /** 一页版简历（默认载入） */
 export function buildMyResume(): Resume {
-  return pick("buildMyResume") ?? buildSampleResume();
+  return fromOwner(owner?.mine) ?? pick("buildMyResume") ?? buildSampleResume();
 }
 
 /** 完整版简历（工具栏「载入完整版」） */
 export function buildFullResume(): Resume {
-  return pick("buildFullResume") ?? buildEmptyResume();
+  return fromOwner(owner?.full) ?? pick("buildFullResume") ?? buildEmptyResume();
 }
 
-/** AI 开发工程师版简历（本机放了私有数据才有，否则 null） */
+/** AI 开发工程师版简历（本机放了私有数据、或线上站长登录后才有，否则 null） */
 export function buildAiDevResume(): Resume | null {
-  return pick("buildAiDevResume");
+  return fromOwner(owner?.aiDev) ?? pick("buildAiDevResume");
 }
 
 /** 本机是否放了私有数据（用来决定「载入一页版/完整版」按钮的行为提示） */

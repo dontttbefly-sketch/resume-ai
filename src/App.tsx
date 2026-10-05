@@ -6,12 +6,14 @@
  *     岗位  JD 匹配分析 / 岗位池
  *     投递  BOSS 直聘逐张投递（本机服务）
  *     经历  经历库 + 经历挖掘
+ *     用户  用户管理（线上版站长专属：给熟人加 AI 额度）
  *
  * 视图切换走 View Transitions（只对快照做合成动画，几乎零开销）。
  * ========================================================================== */
 
 import { useEffect } from "react";
 
+import { AdminView } from "./components/admin/AdminView";
 import { DeliverView } from "./components/deliver/DeliverView";
 import { DialogHost } from "./components/kit/Dialog";
 import { Toaster } from "./components/kit/Toast";
@@ -77,6 +79,7 @@ export default function App() {
         {view === "match" && <MatchView />}
         {view === "deliver" && <DeliverView />}
         {view === "library" && <LibraryView />}
+        {view === "admin" && <AdminView />}
       </main>
       <DialogHost />
       <Toaster />

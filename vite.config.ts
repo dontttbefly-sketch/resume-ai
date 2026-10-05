@@ -1,9 +1,8 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { rmSync } from "node:fs";
 import path from "node:path";
-
-import { bossBridge } from "./server/bossBridge";
 
 /* ============================================================================
  * 带重试的上游请求
@@ -152,6 +151,34 @@ function llmProxy(apiKey: string, baseUrl: string, defaultModel: string): Plugin
   };
 }
 
+/* ============================================================================
+ * 公开版构建：不带站长的私人简历
+ *
+ * RESUME_PUBLIC_BUILD=1 时：src/data/private/ 下的模块一律换成空模块
+ * （privateResume.ts 会自动回退到示例简历），构建完再删掉产物里的 private/ 图片。
+ * 给熟人用的线上版本走这条路，你的真实简历、证件照不会进产物。
+ * ========================================================================== */
+
+function privateDataGuard(enabled: boolean): Plugin {
+  const privateDir = path.resolve("src/data/private") + path.sep;
+  let outDir = path.resolve("dist");
+  return {
+    name: "private-data-guard",
+    apply: "build",
+    enforce: "pre",
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    load(id) {
+      if (enabled && path.resolve(id.split("?")[0]).startsWith(privateDir)) return "export {};";
+      return null;
+    },
+    closeBundle() {
+      if (enabled) rmSync(path.join(outDir, "private"), { recursive: true, force: true });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiKey = env.MINIMAX_API_KEY ?? "";
@@ -160,19 +187,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      privateDataGuard(process.env.RESUME_PUBLIC_BUILD === "1"),
       react(),
       tailwindcss(),
       llmProxy(apiKey, baseUrl, model),
-      // BOSS 直聘投递服务（本机）：技能目录默认在项目根下，可用 BOSS_SKILL_DIR 指到别处
-      bossBridge({
-        skillDir: path.resolve(env.BOSS_SKILL_DIR || "boss-zhipin-assistant-egolite"),
-      }),
     ],
     define: {
       // 只把「有没有配 key」这个布尔值交给前端，key 本身不进前端
       __HAS_LLM_KEY__: JSON.stringify(apiKey.length > 0),
-      // 投递服务只在本机开发服务器上有；线上静态部署时前端据此直接显示「需在本机运行」
-      __HAS_BOSS_BRIDGE__: JSON.stringify(mode === "development"),
     },
     // GitHub Pages 项目页部署在子路径下（VITE_PAGES_BASE=/resume-ai/），
     // 本地开发不设就是 /

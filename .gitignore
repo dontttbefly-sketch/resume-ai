@@ -28,3 +28,6 @@ boss-zhipin-assistant-egolite/
 
 # 根目录的 PDF 都是真实简历导出
 /*.pdf
+
+# 本机执行器的配对码等设置
+runner_config.json

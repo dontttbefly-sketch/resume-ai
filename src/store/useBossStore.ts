@@ -1,85 +1,59 @@
 /* ============================================================================
- * BOSS 投递 · 状态机
+ * BOSS 投递 · 网页端状态（看进度、改设置、点开始）
  *
- *   同步：每 4 秒向本机服务拉一次快照（版本号没变只回 unchanged，几十字节）
- *   单步：下一张 → 读 JD → AI 判 → 投递 / 跳过
- *         手动模式最后一步由你点；自动模式把单步串成循环
+ * 真正干活的是本机执行器（runner/boss_runner.py）：点「开始」后它在终端里
+ * 自动走「下一张 → 读 JD → AI 判 → 投 / 跳」，按关键词计划换词，投到每天
+ * 目标就停。这里只做三件事：
+ *   1. 连接：执行器开没开 → 有没有配对 → 已连接
+ *   2. 同步：每 1.2 秒拉一次实时状态；本机文件（投递记录等）变了才拉全量
+ *   3. 遥控：开始 / 暂停 / 逐张确认 / 每天目标 / 设置
  *
- * 护栏（与技能红线一致，不放松任何一条）：
- *   - 一次只处理一张卡，严格按列表顺序（游标在脚本里，网页不跳序）
- *   - 投递超时 ≠ 已投递：停下提示，不补记录
- *   - 未知弹窗 / 页面异常 / 日上限：整批停手，交给人
- *   - 今日已投到 148（BOSS 上限 150/天）自动收工
- *   - 别的会话正在操作浏览器时，网页只看不动
+ * 关掉网页不影响执行器继续跑；重新打开会自动接上当前进度。
  * ========================================================================== */
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
 
 import {
-  BossError,
   fetchState,
-  runAction,
+  hello,
+  inviteCode,
+  pairCode,
+  pushConfig,
+  RunnerError,
   saveProfile as apiSaveProfile,
+  sendAction,
+  setPairCode,
+  type AutoState,
   type BossProfile,
-  type BossSnapshot,
-  type RunOut,
-  type Surface,
+  type EnvItem,
+  type ExternalInfo,
+  type ListEnd,
+  type LiveCard,
+  type Notice,
+  type Phase,
+  type PlanInfo,
+  type RunnerData,
+  type Verdict,
 } from "../lib/bossApi";
-import { judgeJob, ruleVerdict, type Verdict } from "../lib/bossJudge";
-import { LlmError } from "../lib/llm";
 import { flattenResume, renderForModel } from "../lib/resumeText";
 import { useResumeStore } from "./useResumeStore";
 
 export const DAILY_CAP = 148;
-const POLL_MS = 4000;
+const POLL_ONLINE_MS = 1200;
+const POLL_OFFLINE_MS = 3000;
 
-export type Phase =
-  | "idle"
-  | "walking"
-  | "scrolling"
-  | "opening"
-  | "judging"
-  | "awaiting"
-  | "delivering"
-  | "rejecting"
-  | "exhausting"
-  | "checking";
-
-export interface LiveCard {
-  surface: Surface;
-  position: number;
-  visibleTotal: number;
-  autoSkipped: number;
-  outcome?: "delivered" | "rejected" | "failed" | "vanished";
-  outcomeNote?: string;
-}
-
-export interface ListEnd {
-  keyword: string;
-  kwExhausted: boolean;
-  recommendExhausted: boolean;
-  blocked?: string;
-}
-
-export interface Notice {
-  tone: "info" | "warn" | "error";
-  text: string;
-}
-
-export interface EnvItem {
-  name: string;
-  ok: boolean;
-  detail: string;
-}
-
-export type StartSource = { kind: "resume" } | { kind: "recommend" } | { kind: "keyword"; keyword: string };
+export type Conn = "checking" | "offline" | "unpaired" | "online";
 
 interface BossState {
-  conn: "unknown" | "online" | "offline";
-  offlineReason: string;
-  snap: BossSnapshot | null;
+  conn: Conn;
+  runner: { version: string; demo: boolean } | null;
+  inviteConfigured: boolean;
+  /** 本机文件数据 + 外部会话 / 忙碌状态 */
+  snap: (RunnerData & { external: ExternalInfo; busy: string | null }) | null;
+  dataVersion: string;
+  plan: PlanInfo | null;
 
+  /* 执行器实时状态（镜像） */
   card: LiveCard | null;
   jd: string;
   jdOk: boolean;
@@ -89,47 +63,27 @@ interface BossState {
   listEnd: ListEnd | null;
   notice: Notice | null;
   env: EnvItem[] | null;
+  auto: AutoState;
 
-  mode: "manual" | "auto";
-  target: number;
-  auto: { running: boolean; done: number; stopReason: string; stopping: boolean };
+  /** 网页这边的提示（比如「上一步还在执行」），优先于执行器的提示显示 */
+  localNotice: Notice | null;
 
   refresh: () => Promise<void>;
   startPolling: () => () => void;
-  setMode: (m: "manual" | "auto") => void;
-  setTarget: (n: number) => void;
-  begin: (source: StartSource) => Promise<void>;
-  next: () => Promise<void>;
-  rejudge: () => Promise<void>;
-  deliver: (by?: "manual" | "auto") => Promise<boolean>;
-  skip: (by?: "manual" | "auto" | "rule", reason?: string) => Promise<void>;
-  startAuto: () => void;
-  stopAuto: (reason?: string) => void;
+  pair: (code: string) => Promise<boolean>;
+  unpair: () => void;
+
+  start: () => Promise<void>;
+  pause: () => Promise<void>;
+  setConfirm: (on: boolean) => Promise<void>;
+  setDailyTarget: (n: number) => Promise<void>;
+  /** 逐张确认时的决定（或没在跑时手动处理当前这张） */
+  deliver: () => Promise<void>;
+  skip: () => Promise<void>;
   exhaustRecommend: () => Promise<void>;
   checkEnv: () => Promise<void>;
   saveProfile: (patch: Partial<BossProfile>) => Promise<boolean>;
   dismissNotice: () => void;
-}
-
-const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
-
-function lastLine(s: string): string {
-  return s.split("\n").filter(Boolean).pop() ?? "";
-}
-
-/** 把脚本的报错翻成人话 */
-function explainFailure(out: RunOut): string {
-  const err = `${out.stderr}\n${out.notes.join("\n")}`;
-  if (out.timedOut) return "脚本执行超时（浏览器可能卡住了），去 Ego 浏览器看一眼";
-  if (err.includes("未知弹窗")) return "出现未知弹窗，已整批停手：请到 Ego 浏览器里处理后再继续";
-  if (err.includes("不感兴趣")) return "误触了「不感兴趣」弹窗，已整批停手：请到 Ego 浏览器里处理";
-  if (err.includes("TaskSpace") || err.includes("ego-browser")) return "连不上 Ego 浏览器：确认 Ego Lite 已打开";
-  return lastLine(out.stderr) || "脚本执行失败";
-}
-
-function errText(e: unknown): string {
-  if (e instanceof BossError || e instanceof LlmError) return e.message;
-  return e instanceof Error ? e.message : String(e);
 }
 
 function resumeBrief(): string {
@@ -137,393 +91,163 @@ function resumeBrief(): string {
   return renderForModel(flattenResume(sections, visibility)).slice(0, 1100);
 }
 
-export const useBossStore = create<BossState>()(
-  persist(
-    (set, get) => {
-      /* ---------------------------- 内部步骤 ---------------------------- */
+const IDLE_AUTO: AutoState = {
+  running: false,
+  dailyTarget: 50,
+  confirm: false,
+  awaiting: false,
+  done: 0,
+  stopReason: "",
+  stopping: false,
+};
 
-      const running = () => get().auto.running;
+export const useBossStore = create<BossState>()((set, get) => {
+  /** 把判岗要用的东西交给执行器：个人密钥、判岗接口、简历摘要 */
+  const handshake = () =>
+    pushConfig({
+      inviteCode: inviteCode(),
+      llmEndpoint: `${window.location.origin}/api/llm`,
+      resumeBrief: resumeBrief(),
+    }).catch(() => {});
 
-      /** 呈现下一张卡（或列表到底 / 被规则拦截） */
-      async function present(action: "walk" | "next" | "more", keyword?: string): Promise<"card" | "end" | "blocked"> {
+  async function act(type: string, payload: Record<string, unknown> = {}): Promise<void> {
+    set({ localNotice: null });
+    try {
+      await sendAction(type, payload);
+    } catch (e) {
+      if (e instanceof RunnerError) {
+        if (e.kind === "offline") set({ conn: "offline" });
+        else if (e.kind === "unpaired") set({ conn: "unpaired" });
+        else if (e.kind !== "rejected") set({ localNotice: { tone: "warn", text: e.message } });
+      }
+    }
+    await get().refresh();
+  }
+
+  return {
+    conn: "checking",
+    runner: null,
+    inviteConfigured: false,
+    snap: null,
+    dataVersion: "",
+    plan: null,
+
+    card: null,
+    jd: "",
+    jdOk: false,
+    verdict: null,
+    judgeError: "",
+    phase: "idle",
+    listEnd: null,
+    notice: null,
+    env: null,
+    auto: IDLE_AUTO,
+    localNotice: null,
+
+    refresh: async () => {
+      const wasOnline = get().conn === "online";
+      if (!wasOnline) {
+        const h = await hello();
+        if (!h) {
+          set({ conn: "offline", runner: null });
+          return;
+        }
+        set({ runner: h });
+        if (!pairCode()) {
+          set({ conn: "unpaired" });
+          return;
+        }
+      }
+      try {
+        const s = await fetchState(get().snap ? get().dataVersion : "");
+        const data = s.data ?? get().snap;
+        const live = s.live;
         set({
-          phase: action === "more" ? "scrolling" : "walking",
-          verdict: null,
-          jd: "",
-          jdOk: false,
-          judgeError: "",
-          listEnd: null,
+          conn: "online",
+          inviteConfigured: s.config.inviteConfigured,
+          dataVersion: s.data ? s.dataVersion : get().dataVersion,
+          snap: data ? { ...data, external: s.external, busy: live.busy } : null,
+          plan: s.plan,
+          card: live.card,
+          jd: live.jd,
+          jdOk: live.jdOk,
+          verdict: live.verdict,
+          judgeError: live.judgeError,
+          phase: live.phase,
+          listEnd: live.listEnd,
+          notice: get().localNotice ?? live.notice,
+          env: live.env,
+          auto: live.auto,
         });
-        const out = await runAction(action, keyword ? { keyword } : {});
-        const r = out.result;
-        if (!r) {
-          set({ phase: "idle" });
-          throw new Error(explainFailure(out));
-        }
-        if (r.blocked) {
-          set({
-            card: null,
-            phase: "idle",
-            listEnd: { keyword: keyword ?? "", kwExhausted: false, recommendExhausted: false, blocked: String(r.reason ?? "被规则拦截") },
-          });
-          return "blocked";
-        }
-        if (r.view_exhausted) {
-          set({
-            card: null,
-            phase: "idle",
-            listEnd: {
-              keyword: String(r.keyword ?? ""),
-              kwExhausted: Boolean(r.kw_exhausted),
-              recommendExhausted: Boolean(r.recommend_exhausted),
-            },
-          });
-          return "end";
-        }
-        if (r.job) {
-          set({
-            card: {
-              surface: r.job as Surface,
-              position: Number(r.present ?? 0),
-              visibleTotal: Number(r.visible_total ?? 0),
-              autoSkipped: Array.isArray(r.auto_skipped_mech) ? r.auto_skipped_mech.length : 0,
-            },
-            phase: "idle",
-          });
-          return "card";
-        }
-        set({ phase: "idle" });
-        throw new Error("脚本返回了无法识别的结果");
+        if (!wasOnline) void handshake();
+      } catch (e) {
+        if (e instanceof RunnerError && e.kind === "unpaired") set({ conn: "unpaired" });
+        else set({ conn: "offline" });
       }
+    },
 
-      /** 读 JD + AI 判（命中机械规则时不读 JD、不调模型） */
-      async function prepare(): Promise<void> {
-        const card = get().card;
-        if (!card || card.outcome) return;
-        const profile = get().snap?.profile ?? {};
-        const jobId = card.surface.jobId;
-
-        const rule = ruleVerdict(card.surface, profile);
-        if (rule) {
-          set({ verdict: rule, phase: "awaiting" });
-          return;
-        }
-
-        set({ phase: "opening" });
-        const out = await runAction("open", { jobId });
-        if (get().card?.surface.jobId !== jobId) return;
-        const r = out.result ?? {};
-        const detail = String(r.detail ?? "").trim();
-        set({ jd: detail, jdOk: Boolean(r.panel_ok) && detail.length > 0 });
-        if (!get().jdOk) {
-          set({ phase: "awaiting", judgeError: "右侧面板没切到这张卡，JD 没读到（可以重试，或直接跳过）" });
-          return;
-        }
-
-        set({ phase: "judging" });
-        try {
-          const v = await judgeJob(card.surface, detail, profile, resumeBrief());
-          if (get().card?.surface.jobId === jobId) set({ verdict: v, phase: "awaiting" });
-        } catch (e) {
-          if (get().card?.surface.jobId === jobId) set({ judgeError: errText(e), phase: "awaiting" });
-        }
-      }
-
-      async function guard(task: () => Promise<void>): Promise<void> {
-        try {
-          await task();
-        } catch (e) {
-          const text = errText(e);
-          set({ phase: "idle", notice: { tone: e instanceof BossError && e.kind === "external" ? "warn" : "error", text } });
-          if (running()) get().stopAuto(text);
-        }
-      }
-
-      async function autoLoop(): Promise<void> {
-        let dry = 0;
-        while (running()) {
-          const today = get().snap?.today?.delivered ?? 0;
-          if (today >= DAILY_CAP) {
-            get().stopAuto(`今日已投 ${today} 份，按惯例收工（BOSS 上限 150/天）`);
-            return;
-          }
-          if (get().auto.done >= get().target) {
-            get().stopAuto(`本轮目标 ${get().target} 份已完成`);
-            return;
-          }
-
-          const card = get().card;
-          if (!card || card.outcome) {
-            const res = await present("next");
-            if (!running()) return;
-            if (res === "blocked") {
-              get().stopAuto(get().listEnd?.blocked ?? "被规则拦截");
-              return;
-            }
-            if (res === "end") {
-              const le = get().listEnd!;
-              if (le.kwExhausted) {
-                get().stopAuto(le.keyword ? `关键词「${le.keyword}」已翻到底，换个关键词继续` : "这一页已翻到底");
-                return;
-              }
-              const more = await present("more");
-              if (!running()) return;
-              if (more !== "card") {
-                dry += 1;
-                if (dry >= 2) {
-                  get().stopAuto("滚动后没有新岗位了，换个关键词继续");
-                  return;
-                }
-                continue;
-              }
-            }
-            dry = 0;
-          }
-
-          if (!get().verdict && !get().judgeError) await prepare();
-          if (!running()) return;
-
-          const v = get().verdict;
-          if (!v) {
-            if (!get().jdOk) {
-              // 面板没切过去：多半是卡片被列表重排挤掉了，不记判否，下一张
-              const c = get().card;
-              if (c) set({ card: { ...c, outcome: "vanished", outcomeNote: "面板没切到这张卡，已略过" } });
-              continue;
-            }
-            get().stopAuto(`AI 判断失败：${get().judgeError}`);
-            return;
-          }
-
-          if (v.deliver) await get().deliver("auto");
-          else await get().skip(v.source === "rule" ? "rule" : "auto", v.reason);
-          if (!running()) return;
-          // 像人一样留一点间隔
-          await sleep(900 + Math.random() * 1600);
-        }
-      }
-
-      /* ---------------------------- 对外动作 ---------------------------- */
-
-      return {
-        conn: "unknown",
-        offlineReason: "",
-        snap: null,
-
-        card: null,
-        jd: "",
-        jdOk: false,
-        verdict: null,
-        judgeError: "",
-        phase: "idle",
-        listEnd: null,
-        notice: null,
-        env: null,
-
-        mode: "manual",
-        target: 30,
-        auto: { running: false, done: 0, stopReason: "", stopping: false },
-
-        refresh: async () => {
-          try {
-            const prev = get().snap;
-            const s = await fetchState(prev?.version);
-            if (!s.available) {
-              set({ conn: "offline", offlineReason: s.reason ?? "投递技能不可用", snap: null });
-              return;
-            }
-            if (s.unchanged && prev) {
-              set({ conn: "online", snap: { ...prev, busy: s.busy, external: s.external } });
-            } else {
-              set({ conn: "online", offlineReason: "", snap: s });
-            }
-          } catch (e) {
-            set({ conn: "offline", offlineReason: errText(e) });
-          }
-        },
-
-        startPolling: () => {
-          void get().refresh();
-          const id = window.setInterval(() => {
-            if (document.visibilityState === "visible" || running()) void get().refresh();
-          }, POLL_MS);
-          return () => window.clearInterval(id);
-        },
-
-        setMode: (mode) => set({ mode }),
-        setTarget: (n) => set({ target: Math.max(1, Math.min(DAILY_CAP, Math.round(n) || 1)) }),
-
-        begin: (source) =>
-          guard(async () => {
-            set({ notice: null });
-            const res =
-              source.kind === "resume"
-                ? await present("next")
-                : source.kind === "recommend"
-                  ? await present("walk")
-                  : await present("walk", source.keyword);
-            if (res === "card" && get().mode === "manual") await prepare();
-          }),
-
-        next: () =>
-          guard(async () => {
-            set({ notice: null });
-            let res = await present("next");
-            if (res === "end" && !get().listEnd?.kwExhausted) res = await present("more");
-            if (res === "card") await prepare();
-          }),
-
-        rejudge: () =>
-          guard(async () => {
-            set({ verdict: null, judgeError: "" });
-            await prepare();
-          }),
-
-        deliver: async (by = "manual") => {
-          const { card, verdict } = get();
-          if (!card || card.outcome) return false;
-          const s = card.surface;
-          set({ phase: "delivering", notice: null });
-          let out: RunOut;
-          try {
-            out = await runAction("deliver", {
-              jobId: s.jobId,
-              company: s.company ?? "",
-              salary: s.salary ?? "",
-              industry: s.industry ?? "",
-              direction: verdict?.direction ?? "",
-              note: { title: s.title, company: s.company, salary: s.salary, city: s.city, industry: s.industry, reason: verdict?.reason, by },
-            });
-          } catch (e) {
-            const text = errText(e);
-            set({ phase: "awaiting", notice: { tone: "error", text } });
-            if (running()) get().stopAuto(text);
-            return false;
-          }
-          const r = out.result ?? {};
-          if (r.delivered_ok) {
-            set((st) => ({
-              phase: "idle",
-              card: st.card ? { ...st.card, outcome: "delivered" } : null,
-              auto: by === "auto" ? { ...st.auto, done: st.auto.done + 1 } : st.auto,
-            }));
-            void get().refresh();
-            return true;
-          }
-
-          let text: string;
-          let fatal = true;
-          if (r.daily_limit) text = "BOSS 提示今日沟通次数已达上限，今天先到这里";
-          else if (r.not_found) {
-            text = "这张卡已从列表消失（BOSS 列表会动态重排），已略过";
-            fatal = false;
-          } else if (r.anomaly) text = `页面异常：${String(r.anomaly)}。去 Ego 浏览器看一眼（可能是验证码或登录过期）`;
-          else if (r.timeout)
-            text = "投递超时：可能已达每日上限，或卡片被列表重排挤掉。超时不等于已投递，别手动补记录，稍后重试这一张。";
-          else if (!out.ok) text = explainFailure(out);
-          else text = String(r.reason ?? "投递没有成功");
-
-          set((st) => ({
-            phase: "idle",
-            card: st.card ? { ...st.card, outcome: fatal ? "failed" : "vanished", outcomeNote: text } : null,
-            notice: { tone: fatal ? "error" : "warn", text },
-          }));
-          if (fatal && running()) get().stopAuto(text);
-          return false;
-        },
-
-        skip: async (by = "manual", reason) => {
-          const { card, verdict } = get();
-          if (!card || card.outcome) return;
-          const s = card.surface;
-          set({ phase: "rejecting" });
-          try {
-            await runAction("reject", {
-              jobId: s.jobId,
-              note: {
-                title: s.title,
-                company: s.company,
-                salary: s.salary,
-                city: s.city,
-                industry: s.industry,
-                reason: reason ?? (verdict && !verdict.deliver ? verdict.reason : "手动跳过"),
-                by,
-              },
-            });
-            set((st) => ({ phase: "idle", card: st.card ? { ...st.card, outcome: "rejected" } : null }));
-            void get().refresh();
-          } catch (e) {
-            const text = errText(e);
-            set({ phase: "awaiting", notice: { tone: "error", text } });
-            if (running()) get().stopAuto(text);
-          }
-        },
-
-        startAuto: () => {
-          if (running()) return;
-          const ext = get().snap?.external;
-          if (ext?.active) {
-            set({ notice: { tone: "warn", text: `${ext.reason}，等它停下再开自动投递` } });
-            return;
-          }
-          set({ auto: { running: true, done: 0, stopReason: "", stopping: false }, notice: null, listEnd: null });
-          void guard(autoLoop).finally(() => {
-            set((st) => ({ auto: { ...st.auto, running: false, stopping: false } }));
-          });
-        },
-
-        stopAuto: (reason) =>
-          set((st) => ({
-            auto: {
-              ...st.auto,
-              running: false,
-              // 当前这一步（脚本子进程）会跑完再停
-              stopping: st.phase !== "idle" && st.phase !== "awaiting",
-              stopReason: reason ?? "已手动暂停",
-            },
-          })),
-
-        exhaustRecommend: () =>
-          guard(async () => {
-            set({ phase: "exhausting", notice: { tone: "info", text: "正在把推荐页滚到底，可能要几分钟…" } });
-            const out = await runAction("exhaust");
-            set({ phase: "idle" });
-            if (!out.result) throw new Error(explainFailure(out));
-            set({ notice: { tone: "info", text: "推荐页已翻到底，关键词搜索已解锁" }, listEnd: null });
-            void get().refresh();
-          }),
-
-        checkEnv: () =>
-          guard(async () => {
-            set({ phase: "checking", env: null });
-            const out = await runAction("env");
-            const items: EnvItem[] = [];
-            for (const line of out.notes) {
-              const m = line.match(/^(✅|❌)\s*([^:：]+)[:：]\s*(.*)$/);
-              if (m) items.push({ ok: m[1] === "✅", name: m[2].trim(), detail: m[3].trim() });
-            }
-            set({ phase: "idle", env: items.length ? items : [{ ok: out.ok, name: "环境检测", detail: lastLine(out.stderr) || "完成" }] });
-          }),
-
-        saveProfile: async (patch) => {
-          try {
-            const profile = await apiSaveProfile(patch);
-            set((st) => ({ snap: st.snap ? { ...st.snap, profile } : st.snap }));
-            void get().refresh();
-            return true;
-          } catch (e) {
-            set({ notice: { tone: "error", text: errText(e) } });
-            return false;
-          }
-        },
-
-        dismissNotice: () => set({ notice: null }),
+    startPolling: () => {
+      let stopped = false;
+      let timer = 0;
+      const loop = async () => {
+        if (stopped) return;
+        if (document.visibilityState === "visible") await get().refresh();
+        if (stopped) return;
+        timer = window.setTimeout(loop, get().conn === "online" ? POLL_ONLINE_MS : POLL_OFFLINE_MS);
+      };
+      void loop();
+      return () => {
+        stopped = true;
+        window.clearTimeout(timer);
       };
     },
-    {
-      name: "resume-ai/boss",
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ mode: s.mode, target: s.target }),
+
+    pair: async (code) => {
+      setPairCode(code);
+      set({ conn: "checking" });
+      await get().refresh();
+      return get().conn === "online";
     },
-  ),
-);
+
+    unpair: () => {
+      setPairCode("");
+      set({ conn: "unpaired", snap: null, dataVersion: "" });
+    },
+
+    start: async () => {
+      await handshake();
+      await act("start");
+    },
+    pause: () => act("pause"),
+    setConfirm: (on) => {
+      set((st) => ({ auto: { ...st.auto, confirm: on } }));
+      return act("set_confirm", { on });
+    },
+    setDailyTarget: (n) => {
+      const target = Math.max(1, Math.min(DAILY_CAP, Math.round(n) || 1));
+      set((st) => ({ auto: { ...st.auto, dailyTarget: target } }));
+      return act("set_target", { target });
+    },
+    deliver: () => act("deliver"),
+    skip: () => act("skip"),
+    exhaustRecommend: () => act("exhaust"),
+    checkEnv: () => act("env"),
+
+    saveProfile: async (patch) => {
+      try {
+        const profile = await apiSaveProfile(patch);
+        set((st) => ({ snap: st.snap ? { ...st.snap, profile } : st.snap }));
+        void get().refresh();
+        return true;
+      } catch (e) {
+        set({ localNotice: { tone: "error", text: e instanceof Error ? e.message : String(e) } });
+        return false;
+      }
+    },
+
+    dismissNotice: () => {
+      set({ localNotice: null, notice: null });
+      void sendAction("dismiss").catch(() => {});
+    },
+  };
+});

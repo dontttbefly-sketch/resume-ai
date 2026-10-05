@@ -1,11 +1,12 @@
 /* ============================================================================
  * 顶栏：悬浮的玻璃胶囊
  *
- *   左：品牌标 + 档案名            中：四个视图            右：视图动作 · 主题 · 头像
+ *   左：品牌标 + 档案名            中：四个视图（站长多一个「用户」）     右：视图动作 · 主题 · 头像
  *
  * 简历在它下面滚过时会被模糊，这是整页「毛玻璃」质感的主要来源。
  * ========================================================================== */
 
+import { useAccount } from "../../lib/account";
 import { exportPdf } from "../../lib/print";
 import { requestExport, useExportFlow } from "../../lib/exportFlow";
 import { setThemeAnimated, switchView } from "../../lib/transitions";
@@ -13,7 +14,7 @@ import { useBossStore } from "../../store/useBossStore";
 import { useSelectionStore } from "../../store/useSelectionStore";
 import { resolveTheme, useUiStore, type AppView } from "../../store/useUiStore";
 import { PrintGuideDialog } from "../PrintGuide";
-import { IconBook, IconDoc, IconDownload, IconMoon, IconPlane, IconSpark, IconSun, IconTarget } from "../icons";
+import { IconBook, IconDoc, IconDownload, IconMoon, IconPlane, IconSpark, IconSun, IconTarget, IconUser } from "../icons";
 import { Button, IconButton } from "../kit/Button";
 import { Segmented } from "../kit/Segmented";
 import { useSpotlight } from "../kit/useSpotlight";
@@ -85,6 +86,7 @@ export function TopBar() {
   const guideOpen = useExportFlow((s) => s.guideOpen);
   const setGuideOpen = useExportFlow((s) => s.setGuideOpen);
   const spot = useSpotlight<HTMLElement>();
+  const isOwner = useAccount((s) => s.me?.role === "owner");
 
   return (
     <header
@@ -110,6 +112,9 @@ export function TopBar() {
             title: "BOSS 投递",
           },
           { value: "library", label: <NavLabel>经历</NavLabel>, icon: <IconBook className="h-4 w-4" />, title: "经历库" },
+          ...(isOwner
+            ? [{ value: "admin" as const, label: <NavLabel>用户</NavLabel>, icon: <IconUser className="h-4 w-4" />, title: "用户管理" }]
+            : []),
         ]}
       />
 
