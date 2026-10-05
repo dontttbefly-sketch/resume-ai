@@ -1,7 +1,7 @@
 /* ============================================================================
  * 顶栏：悬浮的玻璃胶囊
  *
- *   左：品牌标 + 档案名            中：四个视图（站长多一个「用户」）     右：视图动作 · 主题 · 头像
+ *   左：品牌标 + 档案名            中：四个视图（站长多一个「用户」）     右：视图动作 · AI 额度 · 主题 · 头像
  *
  * 简历在它下面滚过时会被模糊，这是整页「毛玻璃」质感的主要来源。
  * ========================================================================== */
@@ -18,6 +18,7 @@ import { IconBook, IconDoc, IconDownload, IconMoon, IconPlane, IconSpark, IconSu
 import { Button, IconButton } from "../kit/Button";
 import { Segmented } from "../kit/Segmented";
 import { useSpotlight } from "../kit/useSpotlight";
+import { QuotaPill } from "../account/QuotaPill";
 import { AccountMenu } from "./AccountMenu";
 import { Logo } from "./Logo";
 import { ProfileMenu } from "./ProfileMenu";
@@ -120,6 +121,7 @@ export function TopBar() {
 
       <div className="flex flex-1 basis-0 items-center justify-end gap-1.5">
         {view === "studio" && <StudioActions />}
+        <QuotaPill />
         <ThemeButton />
         <AccountMenu />
       </div>

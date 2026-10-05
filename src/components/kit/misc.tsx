@@ -39,8 +39,18 @@ export function ShimmerText({ children, className = "" }: { children: ReactNode;
   return <span className={`shimmer-text ${className}`}>{children}</span>;
 }
 
-/** 数字滚动到目标值（只在值变化时跑一小段 rAF） */
-export function NumberTicker({ value, duration = 900, className = "" }: { value: number; duration?: number; className?: string }) {
+/** 数字滚动到目标值（只在值变化时跑一小段 rAF）；format 默认是千分位 */
+export function NumberTicker({
+  value,
+  duration = 900,
+  className = "",
+  format = (n: number) => n.toLocaleString("zh-CN"),
+}: {
+  value: number;
+  duration?: number;
+  className?: string;
+  format?: (n: number) => string;
+}) {
   const [shown, setShown] = useState(value);
   const fromRef = useRef(value);
 
@@ -68,7 +78,7 @@ export function NumberTicker({ value, duration = 900, className = "" }: { value:
     };
   }, [value, duration]);
 
-  return <span className={`tnum ${className}`}>{shown.toLocaleString("zh-CN")}</span>;
+  return <span className={`tnum ${className}`}>{format(shown)}</span>;
 }
 
 /** 细线进度环（单色） */
